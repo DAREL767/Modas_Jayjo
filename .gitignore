@@ -1,0 +1,40 @@
+# ==========================================
+# Entornos Virtuales y Python
+# ==========================================
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==========================================
+# Variables de Entorno y Secretos (CRÍTICO)
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.pem
+
+# ==========================================
+# Frontend / Node.js (Para cuando inicies React/Vite)
+# ==========================================
+node_modules/
+dist/
+build/
+.npm
+*.log
+
+# ==========================================
+# Configuración del Editor e IDEs
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==========================================
+# Archivos del Sistema Operativo
+# ==========================================
+.DS_Store
+Thumbs.db
