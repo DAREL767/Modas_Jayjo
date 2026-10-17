@@ -1,14 +1,20 @@
-## 📌 Descripción de los Cambios
-<!-- Resumen de lo que implementa o corrige este PR -->
+## Resumen
 
-## 🔗 Issue Relacionado
-<!-- Vincula el issue usando: Closes #NumeroDeIssue -->
-Closes #
+<!-- Qué cambia y por qué. -->
 
-## 🧪 Pruebas Realizadas
-- [ ] Pruebas unitarias/endpoints verificados con Swagger UI
-- [ ] Conexión a la base de datos validada
-- [ ] Sin errores en la consola de la terminal
+## Trazabilidad
 
-## 📷 Evidencia / Capturas (Opcional)
-<!-- Adjunta capturas o logs si aplica -->
+- HU / CR: <!-- HU-### / CR-### -->
+- Issue relacionado: <!-- Closes #123, si aplica -->
+- Rama destino: <!-- develop / main -->
+
+## Verificación
+
+- Validaciones ejecutadas: <!-- comandos y resultados; indica si no aplica -->
+- [ ] Revisé el diff.
+- [ ] Actualicé la documentación afectada.
+- [ ] No incluí secretos ni archivos locales.
+
+## Notas para revisión
+
+<!-- Riesgos, decisiones o pasos manuales relevantes -->
