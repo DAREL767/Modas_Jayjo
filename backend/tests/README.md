@@ -1,6 +1,6 @@
 # Pruebas del backend
 
-Desde `backend/`, instala las dependencias y ejecuta las pruebas unitarias:
+Desde `backend/`, instala las dependencias y ejecuta las pruebas:
 
 ```powershell
 .\venv\Scripts\Activate.ps1
@@ -9,21 +9,18 @@ python -m pytest
 ```
 
 Las pruebas unitarias usan repositorios simulados y no se conectan a MongoDB.
-La prueba de integración queda omitida salvo que se configure una base desechable
-mediante `MONGODB_TEST_URI` y `MONGODB_TEST_DATABASE`. La base temporal que crea
-la prueba lleva un sufijo aleatorio y se elimina al terminar.
+La configuración de pruebas se carga desde `backend/.env`; también puedes definir
+`MONGODB_TEST_URI` y `MONGODB_TEST_DATABASE` en el entorno del proceso. Si ambas
+variables están configuradas, pytest ejecuta la prueba de integración.
 
-No apuntes esas variables a la base de datos de la tienda. `MONGODB_TEST_DATABASE`
-debe ser distinta de `DATABASE_NAME`. Ejecuta la integración con:
+La integración crea una base temporal aleatoria (con nombre compatible con el
+límite de Atlas), ejecuta CRUD y elimina únicamente esa base temporal al terminar.
+`MONGODB_TEST_DATABASE` debe ser distinta de `DATABASE_NAME`; usa una URI y un
+usuario de MongoDB con permisos para crear y eliminar bases temporales. Nunca
+configures las variables de prueba para apuntar a los datos de la tienda.
+
+Para ejecutar solo la integración:
 
 ```powershell
-$env:MONGODB_TEST_URI = "<URI de MongoDB para pruebas>"
-$env:MONGODB_TEST_DATABASE = "modas_jayjo_test"
 python -m pytest -m integration
-```
-
-Para ejecutar unitarias y la integración cuando esté configurada:
-
-```powershell
-python -m pytest
 ```
