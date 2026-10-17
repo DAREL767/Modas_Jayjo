@@ -1,24 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.database.database import get_database
-from app.core.security import verify_password, create_access_token, get_current_user
-from app.schemas.user import Token, UserResponse
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.service import AuthService, InactiveUserError, InvalidCredentialsError
+from app.modules.auth.schemas import Token
+from app.modules.users.schemas import UserResponse
+from app.infrastructure.mongodb.user_repository import UserRepository
+from app.security.tokens import create_access_token
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    db = get_database()
-    user = await db["users"].find_one({"username": form_data.username})
-    
-    if not user or not verify_password(form_data.password, user["password"]):
+    service = AuthService(UserRepository())
+    try:
+        user = await service.authenticate(form_data.username, form_data.password)
+    except InvalidCredentialsError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
-    if not user.get("is_active", True):
+    except InactiveUserError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Usuario inactivo"
