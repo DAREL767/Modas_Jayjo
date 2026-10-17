@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 MAX_DATABASE_NAME_BYTES = 38
 
 
-def _temporary_database_name(production_database_name: str) -> str:
+def _temporary_database_name(*reserved_database_names: str) -> str:
     """Return a short, unique database name within Atlas's name limit."""
     for _ in range(5):
         database_name = f"mjj_pytest_{uuid4().hex[:16]}"
         if (
-            database_name != production_database_name
+            database_name not in reserved_database_names
             and len(database_name.encode("utf-8")) <= MAX_DATABASE_NAME_BYTES
         ):
             return database_name
@@ -26,10 +26,10 @@ def _temporary_database_name(production_database_name: str) -> str:
 
 
 def test_temporary_database_name_is_short_and_not_production():
-    production_database_name = "modas_jayjo_db"
-    temporary_database = _temporary_database_name(production_database_name)
+    reserved_database_names = ("modas_jayjo_db", "mjj_pytest_reserved")
+    temporary_database = _temporary_database_name(*reserved_database_names)
 
-    assert temporary_database != production_database_name
+    assert temporary_database not in reserved_database_names
     assert len(temporary_database.encode("utf-8")) <= MAX_DATABASE_NAME_BYTES
 
 
@@ -43,7 +43,9 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
     if base_test_database == settings.DATABASE_NAME:
         pytest.fail("MONGODB_TEST_DATABASE must be different from DATABASE_NAME")
 
-    temporary_database = _temporary_database_name(settings.DATABASE_NAME)
+    temporary_database = _temporary_database_name(
+        settings.DATABASE_NAME, base_test_database
+    )
     assert len(temporary_database.encode("utf-8")) <= MAX_DATABASE_NAME_BYTES
     monkeypatch.setattr(settings, "MONGODB_URI", test_uri)
     monkeypatch.setattr(settings, "DATABASE_NAME", temporary_database)
