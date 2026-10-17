@@ -7,12 +7,19 @@ class Database:
 db = Database()
 
 async def connect_to_mongo():
-    db.client = AsyncIOMotorClient(settings.MONGODB_URI)
+    client = AsyncIOMotorClient(settings.MONGODB_URI)
+    try:
+        await client.admin.command("ping")
+    except Exception:
+        client.close()
+        raise
+    db.client = client
     print("Conexión exitosa a MongoDB Atlas (Modas Jayjo POS)")
 
 async def close_mongo_connection():
     if db.client:
         db.client.close()
+        db.client = None
         print("Conexión a MongoDB cerrada.")
 
 def get_database():
