@@ -7,6 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from app.infrastructure.mongodb.collections import get_users_collection
 from app.modules.users.errors import DuplicateUserError, InvalidUserIdError
 from app.modules.users.ports import UserDocument
+from app.modules.auth.errors import GoogleIdentityConflictError
 
 
 class UserRepository:
@@ -24,6 +25,31 @@ class UserRepository:
 
     async def get_by_username(self, username: str) -> UserDocument | None:
         return await self._users().find_one({"username": username})
+
+    async def get_by_google_subject(self, subject: str) -> UserDocument | None:
+        return await self._users().find_one(
+            {"google_sub": subject}, {"password": 0}
+        )
+
+    async def link_google_subject(
+        self, user_id: str, subject: str
+    ) -> UserDocument | None:
+        try:
+            return await self._users().find_one_and_update(
+                {
+                    "_id": self._object_id(user_id),
+                    "is_active": {"$ne": False},
+                    "$or": [
+                        {"google_sub": {"$exists": False}},
+                        {"google_sub": None},
+                    ],
+                },
+                {"$set": {"google_sub": subject}},
+                return_document=ReturnDocument.AFTER,
+                projection={"password": 0},
+            )
+        except DuplicateKeyError as exc:
+            raise GoogleIdentityConflictError from exc
 
     async def exists_by_role(self, role: str) -> bool:
         return await self._users().find_one({"role": role}) is not None

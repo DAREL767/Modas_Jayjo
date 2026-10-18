@@ -9,6 +9,12 @@
 
 El arranque falla con un error explícito si MongoDB no está disponible o si falta la configuración necesaria para crear el primer administrador. No hay credenciales de administrador predeterminadas. El bootstrap no cambia credenciales cuando ya existe un administrador activo.
 
+### Acceso con Google
+
+Configura `GOOGLE_CLIENT_IDS` como una lista separada por comas con los client IDs OAuth permitidos para los clientes web y móvil. Si no se define, el endpoint `POST /api/auth/google` responde que el proveedor no está configurado. El backend verifica el ID token de Google y solo admite correos verificados.
+
+No existe auto-registro: la primera vinculación requiere un usuario activo creado por el administrador, su username y la contraseña que ya tiene asignada; además, el correo local debe coincidir con el correo verificado de Google. Después de vincular el identificador estable `sub`, los siguientes inicios requieren solo la credencial Google. El rol se conserva desde la base local y la API devuelve el JWT de la aplicación. Nunca se acepta el rol enviado por el cliente o por Google.
+
 ### Compatibilidad de roles existentes
 
 En el primer arranque se convierten los roles históricos `vendedor` y `cajero` a `vendor`. La identidad exacta del administrador sembrado por la versión anterior (`admin` / `admin@modasjayjo.com`) se desactiva y degrada a `vendor`; configura un username y email nuevos para crear el administrador seguro. La operación es idempotente y conserva el registro para referencias históricas. Después de esta normalización los únicos roles nuevos y válidos son `admin` y `vendor`.

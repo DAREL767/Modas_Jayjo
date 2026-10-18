@@ -2,6 +2,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from app.infrastructure.mongodb.repositories.user_repository import UserRepository
+from app.infrastructure.google.identity_verifier import GoogleIDTokenVerifier
+from app.core.config import settings
+from app.modules.auth.google_service import GoogleAuthService
 from app.modules.auth.service import AuthService
 from app.modules.users.service import UserService
 from app.security.tokens import InvalidTokenError, decode_access_token
@@ -16,6 +19,15 @@ def get_user_service() -> UserService:
 
 def get_auth_service() -> AuthService:
     return AuthService(UserRepository())
+
+
+def get_google_auth_service() -> GoogleAuthService:
+    users = UserRepository()
+    return GoogleAuthService(
+        users=users,
+        local_auth=AuthService(users),
+        verifier=GoogleIDTokenVerifier(settings.google_client_id_allowlist),
+    )
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:

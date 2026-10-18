@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
+    GOOGLE_CLIENT_IDS: str | None = None
 
     INITIAL_ADMIN_USERNAME: str | None = None
     INITIAL_ADMIN_EMAIL: str | None = None
@@ -51,6 +52,24 @@ class Settings(BaseSettings):
         if value.lower() in placeholders:
             raise ValueError("SECRET_KEY no puede usar un valor de ejemplo")
         return value
+
+    @field_validator("GOOGLE_CLIENT_IDS", mode="before")
+    @classmethod
+    def normalize_google_client_ids(cls, value: str | None) -> str | None:
+        if value is None or not isinstance(value, str) or not value.strip():
+            return None
+        client_ids = [client_id.strip() for client_id in value.split(",")]
+        if any(not client_id for client_id in client_ids):
+            raise ValueError("GOOGLE_CLIENT_IDS contiene un identificador vacío")
+        if len(client_ids) != len(set(client_ids)):
+            raise ValueError("GOOGLE_CLIENT_IDS no puede contener duplicados")
+        return ",".join(client_ids)
+
+    @property
+    def google_client_id_allowlist(self) -> tuple[str, ...]:
+        if not self.GOOGLE_CLIENT_IDS:
+            return ()
+        return tuple(self.GOOGLE_CLIENT_IDS.split(","))
 
     @model_validator(mode="after")
     def validate_production_secrets(self):
