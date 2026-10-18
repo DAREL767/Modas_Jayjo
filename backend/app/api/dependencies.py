@@ -2,8 +2,15 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from app.infrastructure.mongodb.repositories.user_repository import UserRepository
+from app.infrastructure.mongodb.repositories.inventory_repository import InventoryRepository
+from app.infrastructure.mongodb.repositories.cash_session_repository import CashSessionRepository
+from app.infrastructure.mongodb.repositories.sales_repository import SaleRepository
 from app.modules.auth.service import AuthService
 from app.modules.users.service import UserService
+from app.modules.inventory.service import InventoryService
+from app.modules.cash_register.service import CashRegisterService
+from app.modules.sales.service import SalesService
+from app.infrastructure.mongodb.transactions import MongoTransactionRunner
 from app.security.tokens import InvalidTokenError, decode_access_token
 
 
@@ -12,6 +19,23 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 def get_user_service() -> UserService:
     return UserService(UserRepository())
+
+
+def get_inventory_service() -> InventoryService:
+    return InventoryService(InventoryRepository())
+
+
+def get_cash_register_service() -> CashRegisterService:
+    return CashRegisterService(CashSessionRepository())
+
+
+def get_sales_service() -> SalesService:
+    return SalesService(
+        SaleRepository(),
+        InventoryRepository(),
+        CashSessionRepository(),
+        MongoTransactionRunner(),
+    )
 
 
 def get_auth_service() -> AuthService:

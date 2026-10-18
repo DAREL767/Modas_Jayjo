@@ -29,6 +29,19 @@ En el primer arranque se convierten los roles históricos `vendedor` y `cajero` 
 Las rutas dependen de casos de uso; los casos de uso dependen de puertos; solo infraestructura implementa persistencia.
 La conexión asíncrona se administra con `AsyncMongoClient` de PyMongo y vive durante el ciclo de vida de FastAPI.
 
+## Base POS (inventario, ventas y caja)
+
+La API POS inicial está organizada por módulos (`inventory`, `sales` y `cash_register`). Los endpoints requieren un JWT válido. Admin y vendor pueden consultar inventario activo, consultar la caja actual y registrar ventas. Solo admin puede crear/editar/desactivar prendas, ajustar existencias y abrir o cerrar caja. Los vendedores no reciben el costo interno de las prendas.
+
+- `GET /api/inventory/` y `GET /api/inventory/{product_id}` consultan prendas. Admin puede incluir inactivas con `active_only=false`.
+- `POST /api/inventory/` crea una variante por talla/color con SKU único. Si inicia con existencias, el alta y el movimiento inicial se guardan juntos.
+- `PATCH /api/inventory/{product_id}` actualiza datos o desactiva la variante con `is_active=false`; no se borran registros referenciados por ventas.
+- `POST /api/inventory/{product_id}/stock-adjustments` registra el ajuste y su motivo en el libro de movimientos.
+- `GET /api/cash-register/current`, `POST /api/cash-register/open` y `POST /api/cash-register/close` manejan una única sesión abierta. El cierre compara efectivo, tarjeta y transferencia esperados y contados, con su diferencia.
+- `POST /api/sales/` requiere `Idempotency-Key` y una sesión abierta. El backend calcula precios y total, guarda una copia de los datos vendidos, registra movimiento de stock y suma el método de pago a caja en una transacción MongoDB. Reintentar la misma clave y carga devuelve la venta ya creada; reutilizarla con otra carga o usuario produce conflicto.
+
+Las ventas y sus movimientos son históricos; actualizar precio o nombre de una prenda no altera los datos de ventas anteriores. La aplicación requiere un MongoDB compatible con transacciones (por ejemplo, Atlas o un replica set local). La integración web será una SPA responsiva con React, Vite y TailwindCSS; se usará TypeScript para mantener contratos explícitos entre la UI y esta API.
+
 ## Pruebas
 
 Consulta [`tests/README.md`](tests/README.md) para comandos unitarios y de integración segura con MongoDB.
