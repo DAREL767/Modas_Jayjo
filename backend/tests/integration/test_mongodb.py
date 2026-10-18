@@ -3,6 +3,7 @@ import os
 from uuid import uuid4
 
 import pytest
+from app.modules.users.errors import DuplicateUserError
 
 from app.core.config import settings
 from app.infrastructure.mongodb import client as mongo_client
@@ -54,7 +55,7 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
     try:
         await mongo_client.connect_to_mongo()
         repository = UserRepository()
-        collection = mongo_client.get_database()["users"]
+        await repository.ensure_indexes()
         username = f"pytest_{uuid4().hex}"
         email = f"{username}@example.invalid"
         user = {
@@ -69,17 +70,21 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         created = await repository.create(user)
         assert created["username"] == username
         assert await repository.get_by_username(username) is not None
+        assert await repository.get_by_id(str(created["_id"])) is not None
         assert await repository.exists_by_username_or_email(username, email)
+        with pytest.raises(DuplicateUserError):
+            await repository.create(user)
 
-        updated = await collection.update_one(
-            {"username": username}, {"$set": {"full_name": "Updated test record"}}
+        updated = await repository.update_by_id(
+            str(created["_id"]), {"full_name": "Updated test record"}
         )
-        assert updated.modified_count == 1
-        assert (await collection.find_one({"username": username}))["full_name"] == "Updated test record"
+        assert updated["full_name"] == "Updated test record"
+        assert "password" not in updated
 
-        deleted = await collection.delete_one({"username": username})
-        assert deleted.deleted_count == 1
-        assert await repository.get_by_username(username) is None
+        assert await repository.deactivate_by_id(str(created["_id"]))
+        deactivated = await repository.get_by_id(str(created["_id"]))
+        assert deactivated["is_active"] is False
+        assert await repository.list_all(is_active=False, limit=10)
     except Exception as exc:
         operation_error = exc
         raise
