@@ -11,7 +11,9 @@ El arranque falla con un error explícito si MongoDB no está disponible o si fa
 
 ### Acceso con Google
 
-Configura `GOOGLE_CLIENT_IDS` como una lista separada por comas con los client IDs OAuth permitidos para los clientes web y móvil. Si no se define, el endpoint `POST /api/auth/google` responde que el proveedor no está configurado. El backend verifica el ID token de Google y solo admite correos verificados.
+Configura `GOOGLE_CLIENT_IDS` con el client ID OAuth de la aplicación web responsiva. Puede contener varios IDs separados por comas si posteriormente se agregan otros clientes. Si no se define, el endpoint `POST /api/auth/google` responde que el proveedor no está configurado. El backend verifica el ID token de Google y solo admite correos verificados.
+
+Configura `CORS_ORIGINS` como una lista separada por comas de orígenes completos, sin rutas ni comodines. En desarrollo se permite `http://localhost:5173` para Vite. En producción define únicamente el origen HTTPS desplegado.
 
 No existe auto-registro: la primera vinculación requiere un usuario activo creado por el administrador, su username y la contraseña que ya tiene asignada; además, el correo local debe coincidir con el correo verificado de Google. Después de vincular el identificador estable `sub`, los siguientes inicios requieren solo la credencial Google. El rol se conserva desde la base local y la API devuelve el JWT de la aplicación. Nunca se acepta el rol enviado por el cliente o por Google.
 

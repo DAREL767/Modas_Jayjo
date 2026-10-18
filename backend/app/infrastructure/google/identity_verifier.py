@@ -42,14 +42,7 @@ class GoogleIDTokenVerifier:
             raise InvalidGoogleTokenError
 
         audiences = claims.get("aud")
-        if isinstance(audiences, str):
-            audience_matches = audiences in self._client_ids
-        elif isinstance(audiences, list) and all(
-            isinstance(audience, str) for audience in audiences
-        ):
-            audience_matches = bool(self._client_ids.intersection(audiences))
-        else:
-            audience_matches = False
+        audience_matches = isinstance(audiences, str) and audiences in self._client_ids
         if not audience_matches:
             raise InvalidGoogleTokenError
 

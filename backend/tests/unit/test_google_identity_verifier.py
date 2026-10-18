@@ -57,6 +57,14 @@ async def test_verifier_rejects_wrong_issuer_and_unregistered_audience(
     monkeypatch.setattr(
         identity_verifier.id_token,
         "verify_oauth2_token",
+        lambda *_: {**valid_claims, "aud": ["web-client-id", "untrusted-client"]},
+    )
+    with pytest.raises(InvalidGoogleTokenError):
+        await verifier.verify("signed-token")
+
+    monkeypatch.setattr(
+        identity_verifier.id_token,
+        "verify_oauth2_token",
         lambda *_: {**valid_claims, "aud": "untrusted-client-id"},
     )
     with pytest.raises(InvalidGoogleTokenError):
