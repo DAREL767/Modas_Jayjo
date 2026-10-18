@@ -10,15 +10,53 @@ on:
       - reopened
   push:
     branches:
-      - feature/CR-014-user-crud-hardening
+      - develop
 
 permissions:
   contents: read
 
 jobs:
-  pytest:
-    name: Python 3.12 / pytest
+  unit:
+    name: Python 3.12 / unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_ENV: test
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      DATABASE_NAME: modas_jayjo_ci_guard
+      SECRET_KEY: unit-tests-only-secret-key-not-for-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run unit tests
+        working-directory: backend
+        run: python -m pytest -m "not integration"
+
+  mongodb-integration:
+    name: MongoDB Atlas integration
+    # Public fork PRs must never execute on the persistent self-hosted machine.
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor == 'DAREL767'
+      )
+    runs-on: [self-hosted, windows, x64]
     timeout-minutes: 10
     env:
       APP_ENV: test
@@ -35,13 +73,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
         working-directory: backend
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
 
-      - name: Run backend tests
+      - name: Run MongoDB integration tests
         working-directory: backend
-        run: python -m pytest
+        run: python -m pytest -m integration
