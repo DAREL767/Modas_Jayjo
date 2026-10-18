@@ -1,28 +1,41 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+import logging
+
+from pymongo import AsyncMongoClient
+
 from app.core.config import settings
 
-class Database:
-    client: AsyncIOMotorClient | None = None
 
-db = Database()
+logger = logging.getLogger(__name__)
 
-async def connect_to_mongo():
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
+
+class MongoClientState:
+    client: AsyncMongoClient | None = None
+
+
+client_state = MongoClientState()
+
+
+async def connect_to_mongo() -> None:
+    """Create and verify the shared MongoDB client."""
+    client = AsyncMongoClient(settings.MONGODB_URI)
     try:
         await client.admin.command("ping")
-    except Exception:
-        client.close()
+    except BaseException:
+        try:
+            await client.close()
+        except Exception:
+            logger.exception("Failed to close MongoDB client after connection failure")
         raise
-    db.client = client
-    print("Conexión exitosa a MongoDB Atlas (Modas Jayjo POS)")
+    client_state.client = client
+    logger.info("MongoDB connection established")
 
-async def close_mongo_connection():
-    if db.client:
-        db.client.close()
-        db.client = None
-        print("Conexión a MongoDB cerrada.")
 
-def get_database():
-    if db.client is None:
-        raise RuntimeError("MongoDB client is not initialized")
-    return db.client[settings.DATABASE_NAME]
+async def close_mongo_connection() -> None:
+    """Close and clear the shared MongoDB client."""
+    client = client_state.client
+    if client is not None:
+        try:
+            await client.close()
+        finally:
+            client_state.client = None
+        logger.info("MongoDB connection closed")

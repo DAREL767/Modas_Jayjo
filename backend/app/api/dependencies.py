@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from app.infrastructure.mongodb.user_repository import UserRepository
+from app.infrastructure.mongodb.repositories.user_repository import UserRepository
 from app.modules.auth.service import AuthService
 from app.modules.users.service import UserService
 from app.security.tokens import InvalidTokenError, decode_access_token

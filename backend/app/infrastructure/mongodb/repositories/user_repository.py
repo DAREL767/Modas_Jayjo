@@ -1,10 +1,10 @@
 from typing import Any
 
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
-from app.infrastructure.mongodb.client import get_database
+from app.infrastructure.mongodb.collections import get_users_collection
 from app.modules.users.errors import DuplicateUserError, InvalidUserIdError
 from app.modules.users.ports import UserDocument
 
@@ -12,47 +12,9 @@ from app.modules.users.ports import UserDocument
 class UserRepository:
     """MongoDB adapter implementing user persistence operations."""
 
-    _USERNAME_INDEX = "uq_users_username"
-    _EMAIL_INDEX = "uq_users_email"
-
     @staticmethod
     def _users():
-        return get_database()["users"]
-
-    @classmethod
-    async def ensure_indexes(cls) -> None:
-        users = cls._users()
-        await users.create_index("username", unique=True, name=cls._USERNAME_INDEX)
-        await users.create_index("email", unique=True, name=cls._EMAIL_INDEX)
-
-    @classmethod
-    async def normalize_legacy_roles(cls) -> int:
-        """Map the former vendedor/cajero values to the supported vendor role."""
-        result = await cls._users().update_many(
-            {"role": {"$in": ["vendedor", "cajero"]}},
-            {"$set": {"role": "vendor"}},
-        )
-        return result.modified_count
-
-    @classmethod
-    async def disable_public_bootstrap_admin(cls) -> bool:
-        """Demote the exact admin identity shipped by the old public bootstrap."""
-        users = cls._users()
-        legacy_admin = await users.find_one(
-            {
-                "username": "admin",
-                "email": "admin@modasjayjo.com",
-                "role": "admin",
-            },
-            {"_id": 1},
-        )
-        if not legacy_admin:
-            return False
-        await users.update_one(
-            {"_id": legacy_admin["_id"]},
-            {"$set": {"role": "vendor", "is_active": False}},
-        )
-        return True
+        return get_users_collection()
 
     @staticmethod
     def _object_id(user_id: str) -> ObjectId:

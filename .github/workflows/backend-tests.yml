@@ -10,23 +10,21 @@ on:
       - reopened
   push:
     branches:
-      - feature/CR-014-user-crud-hardening
+      - develop
 
 permissions:
   contents: read
 
 jobs:
-  pytest:
-    name: Python 3.12 / pytest
+  unit:
+    name: Python 3.12 / unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       APP_ENV: test
-      MONGODB_URI: ${{ secrets.MONGODB_TEST_URI }}
-      MONGODB_TEST_URI: ${{ secrets.MONGODB_TEST_URI }}
-      MONGODB_TEST_DATABASE: ${{ secrets.MONGODB_TEST_DATABASE }}
+      MONGODB_URI: mongodb://127.0.0.1:27017
       DATABASE_NAME: modas_jayjo_ci_guard
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      SECRET_KEY: unit-tests-only-secret-key-not-for-production
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -40,8 +38,53 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
 
-      - name: Run backend tests
+      - name: Run unit tests
         working-directory: backend
-        run: python -m pytest
+        run: python -m pytest -m "not integration"
+
+  mongodb-integration:
+    name: MongoDB Atlas integration
+    # Public fork PRs must never execute on the persistent self-hosted machine.
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor == 'DAREL767'
+      )
+    runs-on: [self-hosted, windows, x64, atlas-test]
+    timeout-minutes: 10
+    env:
+      APP_ENV: test
+      MONGODB_URI: ${{ secrets.MONGODB_TEST_URI }}
+      MONGODB_TEST_URI: ${{ secrets.MONGODB_TEST_URI }}
+      MONGODB_TEST_DATABASE: ${{ secrets.MONGODB_TEST_DATABASE }}
+      DATABASE_NAME: modas_jayjo_ci_guard
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify installed Python
+        working-directory: backend
+        shell: cmd
+        run: |
+          python --version
+          python -c "import sys; assert sys.version_info[:2] == (3, 12), sys.version"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        shell: cmd
+        run: |
+          python -m venv .venv-ci
+          .venv-ci\Scripts\python.exe -m pip install --upgrade pip
+          .venv-ci\Scripts\python.exe -m pip install -r requirements.txt
+
+      - name: Run MongoDB integration tests
+        working-directory: backend
+        shell: cmd
+        run: .venv-ci\Scripts\python.exe -m pytest -m integration

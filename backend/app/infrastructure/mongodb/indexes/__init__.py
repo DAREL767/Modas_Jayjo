@@ -1,0 +1,1 @@
+"""MongoDB index definitions."""
