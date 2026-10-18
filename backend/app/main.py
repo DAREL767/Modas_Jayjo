@@ -1,5 +1,6 @@
-from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.infrastructure.mongodb.client import connect_to_mongo, close_mongo_connection
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -34,6 +35,14 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.PROJECT_VERSION,
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_allowlist,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
 
 app.include_router(api_router)
