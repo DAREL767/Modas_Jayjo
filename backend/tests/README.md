@@ -24,3 +24,15 @@ Para ejecutar solo la integración:
 ```powershell
 python -m pytest -m integration
 ```
+
+## CRUD de usuarios
+
+El router `/api/users` requiere rol administrador y expone:
+
+- `POST /api/users/`: crea usuario; normaliza username/email y guarda únicamente el hash de la contraseña.
+- `GET /api/users/`: lista con `skip`, `limit` (máximo 100) y filtro opcional `is_active`.
+- `GET /api/users/{user_id}`: consulta por ObjectId.
+- `PATCH /api/users/{user_id}`: actualiza solo los campos enviados; permite cambiar contraseña.
+- `DELETE /api/users/{user_id}`: desactiva la cuenta (`is_active=false`) para preservar referencias históricas.
+
+La aplicación asegura índices únicos de MongoDB para username y email al iniciar. Si la colección ya contiene duplicados, la creación del índice detendrá el arranque; deben detectarse y resolverse antes de desplegar esta versión.
