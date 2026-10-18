@@ -5,6 +5,9 @@ from app.infrastructure.mongodb.client import connect_to_mongo, close_mongo_conn
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.infrastructure.mongodb.indexes.user_indexes import ensure_user_indexes
+from app.infrastructure.mongodb.indexes.inventory_indexes import ensure_inventory_indexes
+from app.infrastructure.mongodb.indexes.cash_register_indexes import ensure_cash_register_indexes
+from app.infrastructure.mongodb.indexes.sales_indexes import ensure_sales_indexes
 from app.infrastructure.mongodb.maintenance.user_maintenance_repository import (
     UserMaintenanceRepository,
 )
@@ -19,6 +22,9 @@ async def lifespan(app: FastAPI):
         maintenance = UserMaintenanceRepository()
         await maintenance.normalize_legacy_roles()
         await ensure_user_indexes()
+        await ensure_inventory_indexes()
+        await ensure_cash_register_indexes()
+        await ensure_sales_indexes()
         await maintenance.disable_public_bootstrap_admin()
         await create_initial_admin(
             users,
