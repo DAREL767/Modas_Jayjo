@@ -7,7 +7,11 @@ from app.modules.users.errors import DuplicateUserError
 
 from app.core.config import settings
 from app.infrastructure.mongodb import client as mongo_client
-from app.infrastructure.mongodb.user_repository import UserRepository
+from app.infrastructure.mongodb.indexes.user_indexes import ensure_user_indexes
+from app.infrastructure.mongodb.maintenance.user_maintenance_repository import (
+    UserMaintenanceRepository,
+)
+from app.infrastructure.mongodb.repositories.user_repository import UserRepository
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +59,8 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
     try:
         await mongo_client.connect_to_mongo()
         repository = UserRepository()
-        await repository.ensure_indexes()
+        maintenance = UserMaintenanceRepository()
+        await ensure_user_indexes()
         username = f"pytest_{uuid4().hex}"
         email = f"{username}@example.invalid"
         user = {
@@ -106,8 +111,8 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
                 "is_active": True,
             }
         )
-        assert await repository.normalize_legacy_roles() == 1
-        assert await repository.disable_public_bootstrap_admin()
+        assert await maintenance.normalize_legacy_roles() == 1
+        assert await maintenance.disable_public_bootstrap_admin()
         legacy_vendor = await repository.get_by_username("legacy_vendor")
         legacy_admin = await repository.get_by_username("admin")
         assert legacy_vendor["role"] == "vendor"
@@ -117,7 +122,7 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         operation_error = exc
         raise
     finally:
-        active_client = mongo_client.db.client
+        active_client = mongo_client.client_state.client
         try:
             if active_client is not None:
                 try:

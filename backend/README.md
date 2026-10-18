@@ -17,7 +17,12 @@ En el primer arranque se convierten los roles históricos `vendedor` y `cajero` 
 
 - `app/api`: composición de dependencias HTTP y autorización por roles.
 - `app/modules`: módulos funcionales y casos de uso, independientes de FastAPI y del driver.
-- `app/infrastructure/mongodb`: ciclo de vida del cliente y adaptadores de persistencia.
+- `app/infrastructure/mongodb/client.py`: ciclo de vida del cliente.
+- `app/infrastructure/mongodb/database.py`: acceso a la base configurada.
+- `app/infrastructure/mongodb/collections.py`: acceso a colecciones compartidas.
+- `app/infrastructure/mongodb/repositories`: adaptadores CRUD por entidad.
+- `app/infrastructure/mongodb/indexes`: índices requeridos por persistencia.
+- `app/infrastructure/mongodb/maintenance`: mantenimiento y compatibilidad de datos existentes.
 - `app/core`: configuración común validada.
 - `app/security`: hashing de contraseñas y tokens.
 

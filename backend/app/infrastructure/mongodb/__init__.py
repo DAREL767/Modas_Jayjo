@@ -1,1 +1,1 @@
-"""MongoDB client and repositories."""
+"""MongoDB infrastructure adapters and lifecycle components."""

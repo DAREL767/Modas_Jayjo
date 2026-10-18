@@ -3,7 +3,11 @@ from contextlib import asynccontextmanager
 from app.infrastructure.mongodb.client import connect_to_mongo, close_mongo_connection
 from app.core.config import settings
 from app.api.v1.router import api_router
-from app.infrastructure.mongodb.user_repository import UserRepository
+from app.infrastructure.mongodb.indexes.user_indexes import ensure_user_indexes
+from app.infrastructure.mongodb.maintenance.user_maintenance_repository import (
+    UserMaintenanceRepository,
+)
+from app.infrastructure.mongodb.repositories.user_repository import UserRepository
 from app.modules.users.bootstrap import create_initial_admin
 
 @asynccontextmanager
@@ -11,9 +15,10 @@ async def lifespan(app: FastAPI):
     await connect_to_mongo()
     try:
         users = UserRepository()
-        await users.normalize_legacy_roles()
-        await users.ensure_indexes()
-        await users.disable_public_bootstrap_admin()
+        maintenance = UserMaintenanceRepository()
+        await maintenance.normalize_legacy_roles()
+        await ensure_user_indexes()
+        await maintenance.disable_public_bootstrap_admin()
         await create_initial_admin(
             users,
             username=settings.INITIAL_ADMIN_USERNAME,
