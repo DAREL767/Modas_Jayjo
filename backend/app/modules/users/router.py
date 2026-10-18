@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from app.modules.users.dependencies import get_user_service
+from app.api.dependencies import get_user_service
 from app.modules.users.errors import (
     CannotModifySelfError,
     DuplicateUserError,
@@ -13,7 +13,7 @@ from app.modules.users.errors import (
 )
 from app.modules.users.schemas import UserCreate, UserResponse, UserRole, UserUpdate
 from app.modules.users.service import UserService
-from app.security.authorization import require_roles
+from app.api.authorization import require_roles
 
 
 require_admin = require_roles([UserRole.ADMIN])

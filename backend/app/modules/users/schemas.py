@@ -12,15 +12,14 @@ from pydantic import (
 
 class UserRole(str, Enum):
     ADMIN = "admin"
-    VENDEDOR = "vendedor"
-    CAJERO = "cajero"
+    VENDOR = "vendor"
 
 
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=120)
-    role: UserRole = UserRole.VENDEDOR
+    role: UserRole = UserRole.VENDOR
     is_active: bool = True
 
     @field_validator("username", mode="before")

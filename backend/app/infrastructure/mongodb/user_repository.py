@@ -25,6 +25,35 @@ class UserRepository:
         await users.create_index("username", unique=True, name=cls._USERNAME_INDEX)
         await users.create_index("email", unique=True, name=cls._EMAIL_INDEX)
 
+    @classmethod
+    async def normalize_legacy_roles(cls) -> int:
+        """Map the former vendedor/cajero values to the supported vendor role."""
+        result = await cls._users().update_many(
+            {"role": {"$in": ["vendedor", "cajero"]}},
+            {"$set": {"role": "vendor"}},
+        )
+        return result.modified_count
+
+    @classmethod
+    async def disable_public_bootstrap_admin(cls) -> bool:
+        """Demote the exact admin identity shipped by the old public bootstrap."""
+        users = cls._users()
+        legacy_admin = await users.find_one(
+            {
+                "username": "admin",
+                "email": "admin@modasjayjo.com",
+                "role": "admin",
+            },
+            {"_id": 1},
+        )
+        if not legacy_admin:
+            return False
+        await users.update_one(
+            {"_id": legacy_admin["_id"]},
+            {"$set": {"role": "vendor", "is_active": False}},
+        )
+        return True
+
     @staticmethod
     def _object_id(user_id: str) -> ObjectId:
         if not ObjectId.is_valid(user_id):

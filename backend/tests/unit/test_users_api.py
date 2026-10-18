@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.modules.auth.dependencies import get_current_user
-from app.modules.users.dependencies import get_user_service
+from app.api.dependencies import get_current_user, get_user_service
 from app.modules.users.router import router as users_router
 from app.modules.users.service import UserService
 
@@ -92,7 +91,7 @@ def test_user_routes_reject_non_admin_users():
     app = FastAPI()
     app.include_router(users_router)
     app.dependency_overrides[get_current_user] = lambda: {
-        "_id": "vendor-id", "role": "vendedor"
+        "_id": "vendor-id", "role": "vendor"
     }
     client = TestClient(app)
 

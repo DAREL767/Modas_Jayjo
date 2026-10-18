@@ -161,5 +161,5 @@ async def test_service_preserves_access_to_the_last_admin():
         await service.deactivate_user(admin["_id"], actor_user_id="other-admin")
     with pytest.raises(CannotModifySelfError):
         await service.update_user(
-            admin["_id"], UserUpdate(role=UserRole.VENDEDOR), actor_user_id=admin["_id"]
+            admin["_id"], UserUpdate(role=UserRole.VENDOR), actor_user_id=admin["_id"]
         )

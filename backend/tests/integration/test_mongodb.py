@@ -85,6 +85,34 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         deactivated = await repository.get_by_id(str(created["_id"]))
         assert deactivated["is_active"] is False
         assert await repository.list_all(is_active=False, limit=10)
+
+        await repository.create(
+            {
+                "username": "legacy_vendor",
+                "email": "legacy_vendor@example.invalid",
+                "full_name": "Legacy vendor",
+                "password": "not-a-real-credential",
+                "role": "vendedor",
+                "is_active": True,
+            }
+        )
+        await repository.create(
+            {
+                "username": "admin",
+                "email": "admin@modasjayjo.com",
+                "full_name": "Legacy bootstrap admin",
+                "password": "not-a-real-credential",
+                "role": "admin",
+                "is_active": True,
+            }
+        )
+        assert await repository.normalize_legacy_roles() == 1
+        assert await repository.disable_public_bootstrap_admin()
+        legacy_vendor = await repository.get_by_username("legacy_vendor")
+        legacy_admin = await repository.get_by_username("admin")
+        assert legacy_vendor["role"] == "vendor"
+        assert legacy_admin["role"] == "vendor"
+        assert legacy_admin["is_active"] is False
     except Exception as exc:
         operation_error = exc
         raise

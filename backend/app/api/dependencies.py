@@ -2,9 +2,20 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from app.infrastructure.mongodb.user_repository import UserRepository
+from app.modules.auth.service import AuthService
+from app.modules.users.service import UserService
 from app.security.tokens import InvalidTokenError, decode_access_token
 
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+
+
+def get_user_service() -> UserService:
+    return UserService(UserRepository())
+
+
+def get_auth_service() -> AuthService:
+    return AuthService(UserRepository())
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
@@ -24,5 +35,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     if user is None:
         raise credentials_exception
     if not user.get("is_active", True):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario inactivo")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Usuario inactivo"
+        )
     return user
+
+
