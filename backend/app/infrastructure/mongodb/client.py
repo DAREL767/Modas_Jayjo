@@ -1,15 +1,15 @@
 import logging
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 
 
 logger = logging.getLogger(__name__)
 
-class MongoClientState:
-    client: AsyncIOMotorClient | None = None
 
+class MongoClientState:
+    client: AsyncMongoClient | None = None
 
 
 client_state = MongoClientState()
@@ -17,11 +17,14 @@ client_state = MongoClientState()
 
 async def connect_to_mongo() -> None:
     """Create and verify the shared MongoDB client."""
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
+    client = AsyncMongoClient(settings.MONGODB_URI)
     try:
         await client.admin.command("ping")
-    except Exception:
-        client.close()
+    except BaseException:
+        try:
+            await client.close()
+        except Exception:
+            logger.exception("Failed to close MongoDB client after connection failure")
         raise
     client_state.client = client
     logger.info("MongoDB connection established")
@@ -29,7 +32,10 @@ async def connect_to_mongo() -> None:
 
 async def close_mongo_connection() -> None:
     """Close and clear the shared MongoDB client."""
-    if client_state.client:
-        client_state.client.close()
-        client_state.client = None
+    client = client_state.client
+    if client is not None:
+        try:
+            await client.close()
+        finally:
+            client_state.client = None
         logger.info("MongoDB connection closed")

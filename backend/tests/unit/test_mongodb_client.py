@@ -21,7 +21,7 @@ class FakeMongoClient:
         self.admin = FakeAdmin(error)
         self.closed = False
 
-    def close(self):
+    async def close(self):
         self.closed = True
 
 
@@ -30,7 +30,7 @@ async def test_connect_pings_and_close_resets_client(monkeypatch):
     fake_client = FakeMongoClient()
     monkeypatch.setattr(settings, "MONGODB_URI", "mongodb://test.invalid")
     monkeypatch.setattr(mongo_client.client_state, "client", None)
-    monkeypatch.setattr(mongo_client, "AsyncIOMotorClient", lambda uri: fake_client)
+    monkeypatch.setattr(mongo_client, "AsyncMongoClient", lambda uri: fake_client)
 
     await mongo_client.connect_to_mongo()
 
@@ -46,7 +46,7 @@ async def test_connect_closes_client_and_propagates_ping_failure(monkeypatch):
     fake_client = FakeMongoClient(ConnectionError("unavailable"))
     monkeypatch.setattr(settings, "MONGODB_URI", "mongodb://test.invalid")
     monkeypatch.setattr(mongo_client.client_state, "client", None)
-    monkeypatch.setattr(mongo_client, "AsyncIOMotorClient", lambda uri: fake_client)
+    monkeypatch.setattr(mongo_client, "AsyncMongoClient", lambda uri: fake_client)
 
     with pytest.raises(ConnectionError, match="unavailable"):
         await mongo_client.connect_to_mongo()

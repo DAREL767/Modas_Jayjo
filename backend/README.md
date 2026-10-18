@@ -27,6 +27,7 @@ En el primer arranque se convierten los roles históricos `vendedor` y `cajero` 
 - `app/security`: hashing de contraseñas y tokens.
 
 Las rutas dependen de casos de uso; los casos de uso dependen de puertos; solo infraestructura implementa persistencia.
+La conexión asíncrona se administra con `AsyncMongoClient` de PyMongo y vive durante el ciclo de vida de FastAPI.
 
 ## Pruebas
 
