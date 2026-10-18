@@ -60,7 +60,6 @@ jobs:
     timeout-minutes: 10
     env:
       APP_ENV: test
-      PYTHON_EXE: 'C:\Users\jamed\AppData\Local\Programs\Python\Python312\python.exe'
       MONGODB_URI: ${{ secrets.MONGODB_TEST_URI }}
       MONGODB_TEST_URI: ${{ secrets.MONGODB_TEST_URI }}
       MONGODB_TEST_DATABASE: ${{ secrets.MONGODB_TEST_DATABASE }}
@@ -74,14 +73,14 @@ jobs:
         working-directory: backend
         shell: cmd
         run: |
-          "%PYTHON_EXE%" --version
-          "%PYTHON_EXE%" -c "import sys; assert sys.version_info[:2] == (3, 12), sys.version"
+          python --version
+          python -c "import sys; assert sys.version_info[:2] == (3, 12), sys.version"
 
       - name: Install backend dependencies
         working-directory: backend
         shell: cmd
         run: |
-          "%PYTHON_EXE%" -m venv .venv-ci
+          python -m venv .venv-ci
           .venv-ci\Scripts\python.exe -m pip install --upgrade pip
           .venv-ci\Scripts\python.exe -m pip install -r requirements.txt
 
