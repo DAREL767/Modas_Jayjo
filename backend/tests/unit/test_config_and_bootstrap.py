@@ -43,6 +43,26 @@ def test_production_requires_long_secret():
         )
 
 
+def test_cors_origins_require_explicit_http_origins():
+    settings = Settings(
+        _env_file=None,
+        MONGODB_URI="mongodb://localhost",
+        SECRET_KEY="a-real-test-secret",
+        CORS_ORIGINS="http://localhost:5173,https://pos.example.com",
+    )
+    assert settings.cors_origin_allowlist == (
+        "http://localhost:5173",
+        "https://pos.example.com",
+    )
+    with pytest.raises(ValueError, match="orígenes explícitos"):
+        Settings(
+            _env_file=None,
+            MONGODB_URI="mongodb://localhost",
+            SECRET_KEY="a-real-test-secret",
+            CORS_ORIGINS="*",
+        )
+
+
 @pytest.mark.anyio
 async def test_bootstrap_requires_explicit_credentials_when_admin_is_missing():
     repository = FakeUserRepository()

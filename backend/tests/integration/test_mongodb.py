@@ -3,6 +3,7 @@ import os
 from uuid import uuid4
 
 import pytest
+from app.modules.auth.errors import GoogleIdentityConflictError
 from app.modules.users.errors import DuplicateUserError
 
 from app.core.config import settings
@@ -77,6 +78,13 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         assert await repository.get_by_username(username) is not None
         assert await repository.get_by_id(str(created["_id"])) is not None
         assert await repository.exists_by_username_or_email(username, email)
+        google_subject = f"google_{uuid4().hex}"
+        linked = await repository.link_google_subject(
+            str(created["_id"]), google_subject
+        )
+        assert linked["google_sub"] == google_subject
+        assert "password" not in linked
+        assert await repository.get_by_google_subject(google_subject) is not None
         with pytest.raises(DuplicateUserError):
             await repository.create(user)
 
@@ -91,7 +99,7 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         assert deactivated["is_active"] is False
         assert await repository.list_all(is_active=False, limit=10)
 
-        await repository.create(
+        legacy_vendor = await repository.create(
             {
                 "username": "legacy_vendor",
                 "email": "legacy_vendor@example.invalid",
@@ -101,6 +109,10 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
                 "is_active": True,
             }
         )
+        with pytest.raises(GoogleIdentityConflictError):
+            await repository.link_google_subject(
+                str(legacy_vendor["_id"]), google_subject
+            )
         await repository.create(
             {
                 "username": "admin",

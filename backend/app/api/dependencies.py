@@ -1,16 +1,23 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from app.infrastructure.mongodb.repositories.user_repository import UserRepository
-from app.infrastructure.mongodb.repositories.inventory_repository import InventoryRepository
-from app.infrastructure.mongodb.repositories.cash_session_repository import CashSessionRepository
+from app.core.config import settings
+from app.infrastructure.google.identity_verifier import GoogleIDTokenVerifier
+from app.infrastructure.mongodb.repositories.cash_session_repository import (
+    CashSessionRepository,
+)
+from app.infrastructure.mongodb.repositories.inventory_repository import (
+    InventoryRepository,
+)
 from app.infrastructure.mongodb.repositories.sales_repository import SaleRepository
-from app.modules.auth.service import AuthService
-from app.modules.users.service import UserService
-from app.modules.inventory.service import InventoryService
-from app.modules.cash_register.service import CashRegisterService
-from app.modules.sales.service import SalesService
+from app.infrastructure.mongodb.repositories.user_repository import UserRepository
 from app.infrastructure.mongodb.transactions import MongoTransactionRunner
+from app.modules.auth.google_service import GoogleAuthService
+from app.modules.auth.service import AuthService
+from app.modules.cash_register.service import CashRegisterService
+from app.modules.inventory.service import InventoryService
+from app.modules.sales.service import SalesService
+from app.modules.users.service import UserService
 from app.security.tokens import InvalidTokenError, decode_access_token
 
 
@@ -42,6 +49,15 @@ def get_auth_service() -> AuthService:
     return AuthService(UserRepository())
 
 
+def get_google_auth_service() -> GoogleAuthService:
+    users = UserRepository()
+    return GoogleAuthService(
+        users=users,
+        local_auth=AuthService(users),
+        verifier=GoogleIDTokenVerifier(settings.google_client_id_allowlist),
+    )
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -63,5 +79,3 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             status_code=status.HTTP_403_FORBIDDEN, detail="Usuario inactivo"
         )
     return user
-
-
