@@ -6,7 +6,6 @@ from app.modules.cash_register.errors import (
     CashSessionNotOpenError,
 )
 from app.modules.cash_register.ports import CashSessionRepositoryPort
-from app.modules.shared.payments import PAYMENT_METHODS, PaymentMethod
 
 
 class CashRegisterService:
@@ -25,7 +24,7 @@ class CashRegisterService:
         data = {
             "status": "open",
             "opening_cash_cop": opening_cash_cop,
-            "sales_by_payment_cop": {method: 0 for method in PAYMENT_METHODS},
+            "sales_cash_cop": 0,
             "opened_by": actor_id,
             "opened_at": now,
             "opening_note": note,
@@ -37,33 +36,31 @@ class CashRegisterService:
 
     async def close_session(
         self,
-        counted_by_payment_cop: dict[PaymentMethod, int],
+        counted_cash_cop: int,
         actor_id: str,
         note: str | None = None,
     ) -> dict:
         current = await self._sessions.get_open_session()
         if current is None:
             raise CashSessionNotOpenError
-        sales = current["sales_by_payment_cop"]
-        expected = {
-            method: sales[method] + (
-                current["opening_cash_cop"] if method == PaymentMethod.CASH.value else 0
-            )
-            for method in PAYMENT_METHODS
-        }
-        counted = {method.value: amount for method, amount in counted_by_payment_cop.items()}
+        expected = current["opening_cash_cop"] + current["sales_cash_cop"]
         data = {
             "status": "closed",
             "closed_by": actor_id,
             "closed_at": datetime.now(UTC),
-            "expected_by_payment_cop": expected,
-            "counted_by_payment_cop": counted,
-            "difference_by_payment_cop": {
-                method: counted[method] - expected[method] for method in PAYMENT_METHODS
-            },
+            "expected_cash_cop": expected,
+            "counted_cash_cop": counted_cash_cop,
+            "difference_cash_cop": counted_cash_cop - expected,
             "closing_note": note,
         }
         closed = await self._sessions.close_session(str(current["_id"]), data)
         if closed is None:
             raise CashSessionAlreadyClosedError
         return closed
+
+    async def list_closed_sessions(
+        self, start_at: datetime, end_at: datetime, *, skip: int = 0, limit: int = 50
+    ) -> list[dict]:
+        return await self._sessions.list_closed_sessions(
+            start_at, end_at, skip=skip, limit=limit
+        )

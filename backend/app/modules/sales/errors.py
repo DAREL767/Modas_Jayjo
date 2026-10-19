@@ -18,5 +18,9 @@ class SaleTotalTooLargeError(SaleError):
     pass
 
 
+class InsufficientCashReceivedError(SaleError):
+    pass
+
+
 class SaleNotFoundError(SaleError):
     pass

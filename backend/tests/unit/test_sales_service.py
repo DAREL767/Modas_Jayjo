@@ -4,6 +4,7 @@ from app.modules.cash_register.errors import CashSessionNotOpenError
 from app.modules.inventory.errors import InsufficientStockError
 from app.modules.sales.errors import (
     DuplicateIdempotencyKeyError,
+    InsufficientCashReceivedError,
     IdempotencyKeyConflictError,
 )
 from app.modules.sales.schemas import SaleCreate
@@ -69,8 +70,8 @@ class FakeCashSessions:
     async def get_open_session(self, *, session=None):
         return self.session
 
-    async def add_sale_total(self, session_id, payment_method, amount_cop, *, session):
-        self.total_by_payment[payment_method.value] += amount_cop
+    async def add_sale_total(self, session_id, amount_cop, *, session):
+        self.total_by_payment["cash"] += amount_cop
         return True
 
 
@@ -81,10 +82,10 @@ def make_service(stock=10):
     return SalesService(sales, inventory, sessions, FakeTransactions()), sales, inventory, sessions
 
 
-def make_sale(quantity=2, payment_method="cash"):
+def make_sale(quantity=2, cash_received_cop=None):
     return SaleCreate(
         items=[{"product_id": PRODUCT_ID, "quantity": quantity}],
-        payment_method=payment_method,
+        cash_received_cop=cash_received_cop if cash_received_cop is not None else 25000 * quantity,
     )
 
 
@@ -97,6 +98,8 @@ async def test_sale_snapshots_server_price_and_updates_stock_and_cash_once():
     )
 
     assert result["total_cop"] == 50000
+    assert result["cash_received_cop"] == 50000
+    assert result["change_cop"] == 0
     assert result["items"][0]["unit_price_cop"] == 25000
     assert inventory.product["stock_quantity"] == 8
     assert sessions.total_by_payment["cash"] == 50000
@@ -149,3 +152,27 @@ async def test_sale_rejects_insufficient_stock_and_closed_cash_session():
         await service.create_sale(
             make_sale(), actor_id="vendor-1", idempotency_key="sale-request-005"
         )
+
+
+@pytest.mark.anyio
+async def test_sale_calculates_cash_change_and_rejects_short_payment():
+    service, sales, inventory, sessions = make_service()
+    result = await service.create_sale(
+        make_sale(quantity=2, cash_received_cop=60000),
+        actor_id="vendor-1",
+        idempotency_key="sale-cash-change-01",
+    )
+
+    assert result["change_cop"] == 10000
+    assert sessions.total_by_payment["cash"] == 50000
+
+    service, sales, inventory, sessions = make_service()
+    with pytest.raises(InsufficientCashReceivedError):
+        await service.create_sale(
+            make_sale(quantity=2, cash_received_cop=49999),
+            actor_id="vendor-1",
+            idempotency_key="sale-cash-short-01",
+        )
+    assert sales.sales == {}
+    assert inventory.product["stock_quantity"] == 10
+    assert sessions.total_by_payment["cash"] == 0

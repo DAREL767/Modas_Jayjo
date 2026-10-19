@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
-import type { PaymentMethod, Product, Sale } from "../api/types";
+import type { Product, Sale } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, formatCop, Notice, Panel } from "../components/Panel";
 
@@ -8,7 +8,7 @@ export function SalesPage() {
   const { accessToken } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [payment, setPayment] = useState<PaymentMethod>("cash");
+  const [cashReceived, setCashReceived] = useState(0);
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -58,12 +58,13 @@ export function SalesPage() {
         accessToken,
         {
           items: cart.map(({ product, quantity }) => ({ product_id: product.id, quantity })),
-          payment_method: payment,
+          cash_received_cop: cashReceived,
         },
         idempotencyKey.current,
       );
       setSale(completed);
       setQuantities({});
+      setCashReceived(0);
       idempotencyKey.current = null;
       await reloadProducts();
     } catch (caught) {
@@ -95,9 +96,10 @@ export function SalesPage() {
       <Panel title="Cobro" description={`${cart.reduce((sum, item) => sum + item.quantity, 0)} unidades en el carrito`}>
         <div className="space-y-4">
           {cart.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Agrega prendas para comenzar una venta.</p> : cart.map(({ product, quantity }) => <div key={product.id} className="flex justify-between gap-3 border-b border-slate-100 pb-3 text-sm"><span>{quantity} × {product.name}</span><span className="font-semibold">{formatCop(quantity * product.unit_price_cop)}</span></div>)}
-          <label className="grid gap-1.5 text-sm font-medium text-slate-700">Método de pago<select className="min-h-11 rounded-xl border border-slate-200 bg-white px-3.5" value={payment} onChange={(event) => { setPayment(event.target.value as PaymentMethod); idempotencyKey.current = null; }}><option value="cash">Efectivo</option><option value="card">Tarjeta</option><option value="transfer">Transferencia</option></select></label>
+          <label className="grid gap-1.5 text-sm font-medium text-slate-700">Efectivo recibido (COP)<input className="min-h-11 rounded-xl border border-slate-200 bg-white px-3.5" type="number" min={total} max={2_000_000_000} step="1" value={cashReceived || ""} onChange={(event) => { setCashReceived(Number(event.target.value)); idempotencyKey.current = null; }} required /></label>
+          <div className="flex items-center justify-between rounded-xl bg-blue-50 p-3 text-sm"><span>Cambio</span><strong>{formatCop(Math.max(cashReceived - total, 0))}</strong></div>
           <div className="flex items-center justify-between border-t border-slate-200 pt-4"><span className="text-sm font-medium text-slate-500">Total estimado</span><strong className="text-xl text-slate-950">{formatCop(total)}</strong></div>
-          <Button className="w-full" disabled={working || cart.length === 0 || loading} onClick={() => void checkout()}>{working ? "Procesando…" : "Confirmar venta"}</Button>
+          <Button className="w-full" disabled={working || cart.length === 0 || loading || cashReceived < total} onClick={() => void checkout()}>{working ? "Procesando…" : "Confirmar venta"}</Button>
           <p className="text-xs leading-5 text-slate-400">Si la conexión falla al confirmar, puedes reintentar con seguridad: se usa la misma clave de idempotencia.</p>
         </div>
       </Panel>

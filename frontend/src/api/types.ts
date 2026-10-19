@@ -54,11 +54,9 @@ export interface ProductUpdate {
   is_active?: boolean;
 }
 
-export type PaymentMethod = "cash" | "card" | "transfer";
-
 export interface SaleRequest {
   items: Array<{ product_id: string; quantity: number }>;
-  payment_method: PaymentMethod;
+  cash_received_cop: number;
 }
 
 export interface SaleLine {
@@ -76,8 +74,9 @@ export interface Sale {
   sale_id: string;
   status: "completed";
   items: SaleLine[];
-  payment_method: PaymentMethod;
   total_cop: number;
+  cash_received_cop: number;
+  change_cop: number;
   cashier_id: string;
   cash_session_id: string;
   idempotency_key: string;
@@ -88,10 +87,10 @@ export interface CashSession {
   id: string;
   status: "open" | "closed";
   opening_cash_cop: number;
-  sales_by_payment_cop: Record<PaymentMethod, number>;
-  expected_by_payment_cop?: Record<PaymentMethod, number> | null;
-  counted_by_payment_cop?: Record<PaymentMethod, number> | null;
-  difference_by_payment_cop?: Record<PaymentMethod, number> | null;
+  sales_cash_cop: number;
+  expected_cash_cop?: number | null;
+  counted_cash_cop?: number | null;
+  difference_cash_cop?: number | null;
   opened_by: string;
   closed_by?: string | null;
   opened_at: string;

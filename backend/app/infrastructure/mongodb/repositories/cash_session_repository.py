@@ -6,7 +6,6 @@ from pymongo.errors import DuplicateKeyError
 
 from app.infrastructure.mongodb.collections import get_cash_sessions_collection
 from app.modules.cash_register.errors import CashSessionAlreadyOpenError
-from app.modules.shared.payments import PaymentMethod
 
 
 class CashSessionRepository:
@@ -32,7 +31,6 @@ class CashSessionRepository:
     async def add_sale_total(
         self,
         session_id: str,
-        payment_method: PaymentMethod,
         amount_cop: int,
         *,
         session,
@@ -40,9 +38,7 @@ class CashSessionRepository:
         result = await self._collection().update_one(
             {"_id": ObjectId(session_id), "status": "open"},
             {
-                "$inc": {
-                    f"sales_by_payment_cop.{payment_method.value}": amount_cop
-                }
+                "$inc": {"sales_cash_cop": amount_cop}
             },
             session=session,
         )
@@ -54,3 +50,15 @@ class CashSessionRepository:
             {"$set": data},
             return_document=ReturnDocument.AFTER,
         )
+
+    async def list_closed_sessions(
+        self, start_at: datetime, end_at: datetime, *, skip: int, limit: int
+    ) -> list[dict]:
+        cursor = (
+            self._collection()
+            .find({"status": "closed", "closed_at": {"$gte": start_at, "$lt": end_at}})
+            .sort("closed_at", -1)
+            .skip(skip)
+            .limit(limit)
+        )
+        return [item async for item in cursor]

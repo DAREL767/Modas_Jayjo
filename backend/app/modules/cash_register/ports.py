@@ -1,22 +1,27 @@
+from datetime import datetime
 from typing import Protocol
-
-from app.modules.shared.payments import PaymentMethod
 
 
 class CashSessionRepositoryPort(Protocol):
     async def get_open_session(self, *, session=None) -> dict | None: ...
     async def open_session(self, data: dict) -> dict: ...
     async def add_sale_total(
-        self, session_id: str, payment_method: PaymentMethod, amount_cop: int, *, session
+        self, session_id: str, amount_cop: int, *, session
     ) -> bool: ...
     async def close_session(
         self, session_id: str, data: dict
     ) -> dict | None: ...
+    async def list_closed_sessions(
+        self, start_at: datetime, end_at: datetime, *, skip: int, limit: int
+    ) -> list[dict]: ...
 
 
 class CashRegisterServicePort(Protocol):
     async def get_current_session(self) -> dict | None: ...
     async def open_session(self, opening_cash_cop: int, actor_id: str, note: str | None): ...
     async def close_session(
-        self, counted_by_payment_cop: dict[PaymentMethod, int], actor_id: str, note: str | None
+        self, counted_cash_cop: int, actor_id: str, note: str | None
     ) -> dict: ...
+    async def list_closed_sessions(
+        self, start_at: datetime, end_at: datetime, *, skip: int, limit: int
+    ) -> list[dict]: ...

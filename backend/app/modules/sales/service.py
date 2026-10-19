@@ -7,6 +7,7 @@ from app.modules.cash_register.errors import CashSessionNotOpenError
 from app.modules.inventory.errors import InsufficientStockError, ProductNotFoundError
 from app.modules.sales.errors import (
     DuplicateIdempotencyKeyError,
+    InsufficientCashReceivedError,
     IdempotencyKeyConflictError,
     ProductPriceChangedError,
     SaleTotalTooLargeError,
@@ -74,6 +75,8 @@ class SalesService:
                 )
             if total > 2_000_000_000:
                 raise SaleTotalTooLargeError
+            if data.cash_received_cop < total:
+                raise InsufficientCashReceivedError
 
             now = datetime.now(UTC)
             sale_id = str(uuid4())
@@ -81,8 +84,9 @@ class SalesService:
                 "sale_id": sale_id,
                 "status": "completed",
                 "items": line_items,
-                "payment_method": data.payment_method.value,
                 "total_cop": total,
+                "cash_received_cop": data.cash_received_cop,
+                "change_cop": data.cash_received_cop - total,
                 "cashier_id": actor_id,
                 "cash_session_id": str(cash_session["_id"]),
                 "idempotency_key": idempotency_key,
@@ -103,7 +107,6 @@ class SalesService:
 
             registered = await self._sessions.add_sale_total(
                 str(cash_session["_id"]),
-                data.payment_method,
                 total,
                 session=session,
             )
