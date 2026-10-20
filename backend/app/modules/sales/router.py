@@ -8,6 +8,7 @@ from app.modules.cash_register.errors import CashSessionNotOpenError
 from app.modules.inventory.errors import InsufficientStockError, ProductNotFoundError
 from app.modules.inventory.errors import InvalidProductIdError
 from app.modules.sales.errors import (
+    InsufficientCashReceivedError,
     IdempotencyKeyConflictError,
     ProductPriceChangedError,
     SaleTotalTooLargeError,
@@ -37,6 +38,11 @@ def _raise_http_error(error: Exception) -> None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El total de la venta excede el máximo permitido",
+        ) from error
+    if isinstance(error, InsufficientCashReceivedError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El efectivo recibido no cubre el total de la venta",
         ) from error
     if isinstance(
         error,
@@ -77,6 +83,7 @@ async def create_sale(
     except (
         CashSessionNotOpenError,
         IdempotencyKeyConflictError,
+        InsufficientCashReceivedError,
         InsufficientStockError,
         InvalidProductIdError,
         ProductNotFoundError,

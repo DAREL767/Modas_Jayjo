@@ -165,8 +165,7 @@ export function InventoryPage() {
         </div>
       </Panel>
 
-      {isAdmin && (
-        <Panel title="Registrar variante" description="El stock inicial también queda registrado como movimiento de inventario.">
+      <Panel title="Registrar nueva prenda" description="Cada registro representa una variante de talla y color. El stock inicial queda registrado como movimiento.">
           <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={createProduct}>
             <Field label="SKU" value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value.toUpperCase() })} required />
             <Field label="Nombre" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
@@ -174,13 +173,12 @@ export function InventoryPage() {
             <Field label="Talla" value={draft.size} onChange={(event) => setDraft({ ...draft, size: event.target.value })} required />
             <Field label="Color" value={draft.color} onChange={(event) => setDraft({ ...draft, color: event.target.value })} required />
             <Field label="Precio (COP)" type="number" min="1" value={draft.unit_price_cop || ""} onChange={(event) => setDraft({ ...draft, unit_price_cop: Number(event.target.value) })} required />
-            <Field label="Costo (COP)" type="number" min="0" value={draft.unit_cost_cop ?? ""} onChange={(event) => setDraft({ ...draft, unit_cost_cop: event.target.value === "" ? null : Number(event.target.value) })} />
+            {isAdmin && <Field label="Costo (COP)" type="number" min="0" value={draft.unit_cost_cop ?? ""} onChange={(event) => setDraft({ ...draft, unit_cost_cop: event.target.value === "" ? null : Number(event.target.value) })} />}
             <Field label="Stock inicial" type="number" min="0" value={draft.stock_quantity} onChange={(event) => setDraft({ ...draft, stock_quantity: Number(event.target.value) })} required />
             <Field label="Alerta de stock bajo" type="number" min="0" value={draft.low_stock_threshold} onChange={(event) => setDraft({ ...draft, low_stock_threshold: Number(event.target.value) })} required />
             <div className="flex items-end"><Button type="submit" disabled={working}>{working ? "Guardando…" : "Crear prenda"}</Button></div>
           </form>
-        </Panel>
-      )}
+      </Panel>
 
       {editing && (
         <div className="fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-product-title">

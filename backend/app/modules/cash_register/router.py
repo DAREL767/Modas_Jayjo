@@ -1,6 +1,7 @@
+from datetime import UTC, date, datetime, time, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.authorization import require_roles
 from app.api.dependencies import get_cash_register_service
@@ -83,10 +84,37 @@ async def close_session(
 ):
     try:
         return await service.close_session(
-            body.counted_by_payment_cop, str(current_user["_id"]), body.note
+            body.counted_cash_cop, str(current_user["_id"]), body.note
         )
     except (
         CashSessionAlreadyClosedError,
         CashSessionNotOpenError,
     ) as error:
         _raise_http_error(error)
+
+
+@router.get(
+    "/history",
+    response_model=list[CashSessionResponse],
+    dependencies=[Depends(require_admin)],
+)
+async def list_closed_sessions(
+    service: CashRegisterDependency,
+    start_date: date,
+    end_date: date,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+):
+    if end_date < start_date or (end_date - start_date).days > 366:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El rango debe ser válido y no puede superar 367 días",
+        )
+    bogota_timezone = timezone(timedelta(hours=-5))
+    start_at = datetime.combine(start_date, time.min, bogota_timezone).astimezone(UTC)
+    end_at = datetime.combine(
+        end_date + timedelta(days=1), time.min, bogota_timezone
+    ).astimezone(UTC)
+    return await service.list_closed_sessions(
+        start_at, end_at, skip=skip, limit=limit
+    )

@@ -1,8 +1,5 @@
 from typing import Protocol
 
-from app.modules.shared.payments import PaymentMethod
-
-
 class SaleRepositoryPort(Protocol):
     async def create(self, sale: dict, *, session) -> dict: ...
     async def get_by_idempotency_key(self, key: str) -> dict | None: ...
@@ -25,7 +22,7 @@ class SaleInventoryPort(Protocol):
 class SaleCashSessionPort(Protocol):
     async def get_open_session(self, *, session=None) -> dict | None: ...
     async def add_sale_total(
-        self, session_id: str, payment_method: PaymentMethod, amount_cop: int, *, session
+        self, session_id: str, amount_cop: int, *, session
     ) -> bool: ...
 
 

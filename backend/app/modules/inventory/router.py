@@ -106,18 +106,21 @@ async def get_product(
 @router.post(
     "/",
     response_model=ProductResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_admin)],
 )
 async def create_product(
     product_in: ProductCreate,
     service: InventoryServiceDependency,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_staff),
 ):
     try:
-        return await service.create_product(
-            product_in, actor_id=str(current_user["_id"])
-        )
+        if current_user.get("role") != UserRole.ADMIN.value:
+            product_in = product_in.model_copy(update={"unit_cost_cop": None})
+        product = await service.create_product(product_in, actor_id=str(current_user["_id"]))
+        if current_user.get("role") != UserRole.ADMIN.value:
+            product.pop("unit_cost_cop", None)
+        return product
     except DuplicateSKUError as error:
         _raise_http_error(error)
 

@@ -4,7 +4,6 @@ import pytest
 
 from app.modules.cash_register.errors import CashSessionAlreadyOpenError
 from app.modules.cash_register.service import CashRegisterService
-from app.modules.shared.payments import PaymentMethod
 
 
 class FakeCashSessions:
@@ -34,29 +33,20 @@ async def test_close_session_calculates_expected_totals_and_discrepancies():
         "_id": "cash-1",
         "status": "open",
         "opening_cash_cop": 100000,
-        "sales_by_payment_cop": {"cash": 35000, "card": 20000, "transfer": 5000},
+        "sales_cash_cop": 35000,
     }
     service = CashRegisterService(repository)
 
     closed = await service.close_session(
-        {
-            PaymentMethod.CASH: 134000,
-            PaymentMethod.CARD: 20000,
-            PaymentMethod.TRANSFER: 6000,
-        },
+        134000,
         "admin-1",
+        "Pagos electrónicos: $25.000; gasto de bolsas: $1.000",
     )
 
-    assert closed["expected_by_payment_cop"] == {
-        "cash": 135000,
-        "card": 20000,
-        "transfer": 5000,
-    }
-    assert closed["difference_by_payment_cop"] == {
-        "cash": -1000,
-        "card": 0,
-        "transfer": 1000,
-    }
+    assert closed["expected_cash_cop"] == 135000
+    assert closed["counted_cash_cop"] == 134000
+    assert closed["difference_cash_cop"] == -1000
+    assert closed["closing_note"] == "Pagos electrónicos: $25.000; gasto de bolsas: $1.000"
     assert closed["status"] == "closed"
     assert isinstance(closed["closed_at"], datetime)
     assert closed["closed_at"].tzinfo == UTC
@@ -70,3 +60,20 @@ async def test_only_one_open_session_can_be_started():
 
     with pytest.raises(CashSessionAlreadyOpenError):
         await service.open_session(25000, "admin-2")
+
+
+@pytest.mark.anyio
+async def test_history_delegates_a_bounded_period_and_pagination():
+    from datetime import UTC, datetime
+
+    class HistoryRepository(FakeCashSessions):
+        async def list_closed_sessions(self, start_at, end_at, *, skip, limit):
+            return [{"start_at": start_at, "end_at": end_at, "skip": skip, "limit": limit}]
+
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    end = datetime(2026, 2, 1, tzinfo=UTC)
+    service = CashRegisterService(HistoryRepository())
+
+    results = await service.list_closed_sessions(start, end, skip=10, limit=20)
+
+    assert results == [{"start_at": start, "end_at": end, "skip": 10, "limit": 20}]

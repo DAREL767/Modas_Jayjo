@@ -57,14 +57,16 @@ export const api = {
       { method: "POST", body: JSON.stringify({ opening_cash_cop, note }) },
       token,
     ),
-  closeCashSession: (
-    token: string,
-    counted_by_payment_cop: Record<"cash" | "card" | "transfer", number>,
-    note?: string,
-  ) =>
+  closeCashSession: (token: string, counted_cash_cop: number, note?: string) =>
     requestJson<CashSession>(
       "/api/cash-register/close",
-      { method: "POST", body: JSON.stringify({ counted_by_payment_cop, note }) },
+      { method: "POST", body: JSON.stringify({ counted_cash_cop, note }) },
+      token,
+    ),
+  cashHistory: (token: string, startDate: string, endDate: string) =>
+    requestJson<CashSession[]>(
+      `/api/cash-register/history?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`,
+      {},
       token,
     ),
   users: (token: string) => requestJson<User[]>("/api/users/", {}, token),

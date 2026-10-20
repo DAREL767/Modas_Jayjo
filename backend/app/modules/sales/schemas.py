@@ -2,9 +2,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.modules.shared.payments import PaymentMethod
-
-
 class SaleLineRequest(BaseModel):
     product_id: str = Field(min_length=24, max_length=24)
     quantity: int = Field(ge=1, le=100)
@@ -12,7 +9,7 @@ class SaleLineRequest(BaseModel):
 
 class SaleCreate(BaseModel):
     items: list[SaleLineRequest] = Field(min_length=1, max_length=100)
-    payment_method: PaymentMethod
+    cash_received_cop: int = Field(ge=0, le=2_000_000_000)
 
     @model_validator(mode="after")
     def reject_repeated_products(self):
@@ -39,8 +36,9 @@ class SaleResponse(BaseModel):
     sale_id: str
     status: str
     items: list[SaleLineResponse]
-    payment_method: PaymentMethod
     total_cop: int
+    cash_received_cop: int
+    change_cop: int
     cashier_id: str
     cash_session_id: str
     idempotency_key: str
