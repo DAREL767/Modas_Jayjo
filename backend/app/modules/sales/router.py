@@ -44,19 +44,18 @@ def _raise_http_error(error: Exception) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El efectivo recibido no cubre el total de la venta",
         ) from error
-    if isinstance(
-        error,
-        (
-            CashSessionNotOpenError,
-            IdempotencyKeyConflictError,
-            InsufficientStockError,
-            ProductPriceChangedError,
-        ),
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="No se pudo registrar la venta por un conflicto de caja, precio o existencias",
-        ) from error
+    conflict_details = (
+        (CashSessionNotOpenError, "No hay una sesión de caja abierta"),
+        (IdempotencyKeyConflictError, "La solicitud entra en conflicto con una venta existente"),
+        (InsufficientStockError, "Las existencias cambiaron y no alcanzan para completar la venta"),
+        (ProductPriceChangedError, "El precio de una prenda cambió; actualiza el carrito antes de continuar"),
+    )
+    for error_type, detail in conflict_details:
+        if isinstance(error, error_type):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=detail,
+            ) from error
     raise error
 
 

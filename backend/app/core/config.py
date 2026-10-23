@@ -1,3 +1,4 @@
+import ipaddress
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
@@ -14,6 +15,7 @@ class Settings(BaseSettings):
 
     APP_ENV: Literal["development", "test", "production"] = "development"
     MONGODB_URI: str
+    MONGODB_DNS_NAMESERVERS: str | None = None
     DATABASE_NAME: str = "modas_jayjo_db"
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
@@ -39,6 +41,22 @@ class Settings(BaseSettings):
         if not value.startswith(("mongodb://", "mongodb+srv://")):
             raise ValueError("MONGODB_URI debe usar mongodb:// o mongodb+srv://")
         return value
+
+    @field_validator("MONGODB_DNS_NAMESERVERS", mode="before")
+    @classmethod
+    def normalize_mongodb_dns_nameservers(cls, value: str | None) -> str | None:
+        if value is None or not isinstance(value, str) or not value.strip():
+            return None
+        nameservers = [server.strip() for server in value.split(",")]
+        if any(not server for server in nameservers):
+            raise ValueError("MONGODB_DNS_NAMESERVERS contiene una dirección vacía")
+        try:
+            normalized = [str(ipaddress.ip_address(server)) for server in nameservers]
+        except ValueError as error:
+            raise ValueError("MONGODB_DNS_NAMESERVERS debe contener direcciones IP") from error
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("MONGODB_DNS_NAMESERVERS no puede contener duplicados")
+        return ",".join(normalized)
 
     @field_validator("ACCESS_TOKEN_EXPIRE_MINUTES")
     @classmethod
@@ -97,6 +115,12 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("CORS_ORIGINS solo admite orígenes HTTP(S) explícitos")
         return ",".join(origins)
+
+    @property
+    def mongodb_dns_nameserver_allowlist(self) -> tuple[str, ...]:
+        if not self.MONGODB_DNS_NAMESERVERS:
+            return ()
+        return tuple(self.MONGODB_DNS_NAMESERVERS.split(","))
 
     @property
     def cors_origin_allowlist(self) -> tuple[str, ...]:
