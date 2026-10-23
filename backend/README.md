@@ -3,6 +3,7 @@
 ## Configuración
 
 1. Copia `.env.example` como `.env` y completa `MONGODB_URI` y `SECRET_KEY`.
+   - Si el resolver del equipo no puede resolver los registros SRV de Atlas, configura `MONGODB_DNS_NAMESERVERS=8.8.8.8,8.8.4.4`. Esto solo corrige la consulta DNS; Atlas también debe permitir la IP pública de salida del equipo.
 2. Genera `SECRET_KEY` con un generador criptográfico. En producción usa al menos 32 caracteres y configura `APP_ENV=production`.
 3. Si la base no tiene un administrador activo, define `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_FULL_NAME` e `INITIAL_ADMIN_PASSWORD`. La contraseña inicial debe tener al menos 12 caracteres. Estas variables solo se necesitan para el primer arranque sin administrador y no deben incluirse en Git.
 4. Instala `requirements.txt` y ejecuta la aplicación desde `backend`.

@@ -72,6 +72,15 @@ export function formatCop(value: number): string {
 
 export function ErrorNotice({ error }: { error: unknown }) {
   if (!error) return null;
-  const message = error instanceof Error ? error.message : "Ocurrió un error inesperado.";
+  let message = "Ocurrió un error inesperado.";
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (typeof error === "string" && error.trim()) {
+    message = error;
+  } else if (typeof error === "object" && error !== null) {
+    const details = error as { message?: unknown; detail?: unknown };
+    if (typeof details.message === "string" && details.message.trim()) message = details.message;
+    else if (typeof details.detail === "string" && details.detail.trim()) message = details.detail;
+  }
   return <Notice>{message}</Notice>;
 }

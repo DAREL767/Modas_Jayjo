@@ -4,6 +4,11 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    host: "localhost",
+    port: 5173,
+    strictPort: true,
+  },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
