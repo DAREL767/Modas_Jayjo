@@ -1,5 +1,6 @@
 import logging
 
+import dns.asyncresolver
 from pymongo import AsyncMongoClient
 
 from app.core.config import settings
@@ -17,6 +18,11 @@ client_state = MongoClientState()
 
 async def connect_to_mongo() -> None:
     """Create and verify the shared MongoDB client."""
+    if settings.mongodb_dns_nameserver_allowlist:
+        resolver = dns.asyncresolver.Resolver(configure=False)
+        resolver.nameservers = list(settings.mongodb_dns_nameserver_allowlist)
+        dns.asyncresolver.default_resolver = resolver
+
     client = AsyncMongoClient(settings.MONGODB_URI)
     try:
         await client.admin.command("ping")
