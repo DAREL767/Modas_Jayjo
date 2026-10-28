@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Obtener la ruta raíz del proyecto (backend/)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+VERCEL_PRODUCTION_ORIGIN = "https://modasjayjo.vercel.app"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Modas Jayjo POS"
@@ -124,9 +125,10 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_allowlist(self) -> tuple[str, ...]:
-        if not self.CORS_ORIGINS:
-            return ()
-        return tuple(self.CORS_ORIGINS.split(","))
+        origins = list(self.CORS_ORIGINS.split(",")) if self.CORS_ORIGINS else []
+        if VERCEL_PRODUCTION_ORIGIN not in origins:
+            origins.append(VERCEL_PRODUCTION_ORIGIN)
+        return tuple(origins)
 
     @model_validator(mode="after")
     def validate_production_secrets(self):

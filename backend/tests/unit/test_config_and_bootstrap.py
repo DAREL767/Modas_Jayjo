@@ -53,6 +53,7 @@ def test_cors_origins_require_explicit_http_origins():
     assert settings.cors_origin_allowlist == (
         "http://localhost:5173",
         "https://pos.example.com",
+        "https://modasjayjo.vercel.app",
     )
     with pytest.raises(ValueError, match="orígenes explícitos"):
         Settings(
@@ -61,6 +62,21 @@ def test_cors_origins_require_explicit_http_origins():
             SECRET_KEY="a-real-test-secret",
             CORS_ORIGINS="*",
         )
+
+
+def test_deployed_vercel_origin_is_allowed_with_existing_backend_allowlist():
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        MONGODB_URI="mongodb://localhost",
+        SECRET_KEY="a-real-test-secret-that-is-long-enough",
+        CORS_ORIGINS="http://localhost:5173",
+    )
+
+    assert settings.cors_origin_allowlist == (
+        "http://localhost:5173",
+        "https://modasjayjo.vercel.app",
+    )
 
 
 @pytest.mark.anyio
