@@ -52,6 +52,14 @@ export function UsersPage() {
     finally { setWorking(false); }
   };
 
+  const reactivate = async (member: User) => {
+    if (!accessToken) return;
+    setWorking(true); setError(null); setNotice("");
+    try { await api.updateUser(accessToken, member.id, { is_active: true }); setNotice(`La cuenta de ${member.full_name} fue reactivada.`); await reload(); }
+    catch (caught) { setError(caught); }
+    finally { setWorking(false); }
+  };
+
   return <div className="space-y-6">
     <Panel title="Personal autorizado" description="Administra las cuentas locales que pueden vincularse con Google.">
       <div className="space-y-4">
@@ -65,7 +73,7 @@ export function UsersPage() {
               <td className="px-4 py-3 font-mono text-xs">{member.username}</td>
               <td className="px-4 py-3"><select aria-label={`Rol de ${member.full_name}`} disabled={working || isSelf || !member.is_active} value={member.role} onChange={(event) => void setRole(member, event.target.value as UserRole)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2"><option value="admin">Administrador</option><option value="vendor">Vendedor</option></select></td>
               <td className="px-4 py-3">{member.is_active ? "Activa" : "Inactiva"}</td>
-              <td className="px-4 py-3">{member.is_active && <Button variant="danger" className="min-h-9 px-3 text-xs" disabled={working || isSelf} onClick={() => void deactivate(member)}>{isSelf ? "Cuenta actual" : "Desactivar"}</Button>}</td>
+              <td className="px-4 py-3">{member.is_active ? <Button variant="danger" className="min-h-9 px-3 text-xs" disabled={working || isSelf} onClick={() => void deactivate(member)}>{isSelf ? "Cuenta actual" : "Desactivar"}</Button> : <Button className="min-h-9 px-3 text-xs" disabled={working} onClick={() => void reactivate(member)}>Reactivar</Button>}</td>
             </tr>;
           })}</tbody>
         </table></div>}

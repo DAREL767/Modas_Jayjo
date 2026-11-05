@@ -85,6 +85,11 @@ def test_admin_can_manage_users_without_exposing_password_hashes():
     ).json()["full_name"] == "Updated Vendor"
     assert client.delete(f"/api/users/{user_id}").status_code == 204
     assert client.get(f"/api/users/{user_id}").json()["is_active"] is False
+    reactivated = client.patch(f"/api/users/{user_id}", json={"is_active": True})
+    assert reactivated.status_code == 200
+    assert reactivated.json()["is_active"] is True
+    assert reactivated.json()["id"] == user_id
+    assert "password" not in reactivated.json()
 
 
 def test_user_routes_reject_non_admin_users():
@@ -97,3 +102,4 @@ def test_user_routes_reject_non_admin_users():
 
     response = client.get("/api/users/")
     assert response.status_code == 403
+    assert client.patch("/api/users/user-id", json={"is_active": True}).status_code == 403
