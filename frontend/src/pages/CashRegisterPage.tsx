@@ -8,7 +8,7 @@ const todayInBogota = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
 }).format(new Date());
 
-export function CashRegisterPage() {
+export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSession) => void }) {
   const { accessToken, user } = useAuth();
   const [session, setSession] = useState<CashSession | null>(null);
   const [openingCash, setOpeningCash] = useState(0);
@@ -27,10 +27,14 @@ export function CashRegisterPage() {
     if (!accessToken) return;
     setLoading(true);
     setError(null);
-    try { setSession(await api.currentCashSession(accessToken)); }
+    try {
+      const current = await api.currentCashSession(accessToken);
+      setSession(current);
+      if (current?.status === "open") onOpened?.(current);
+    }
     catch (caught) { setError(caught); }
     finally { setLoading(false); }
-  }, [accessToken]);
+  }, [accessToken, onOpened]);
   useEffect(() => { void reload(); }, [reload]);
 
   const openSession = async (event: FormEvent<HTMLFormElement>) => {
@@ -38,8 +42,10 @@ export function CashRegisterPage() {
     if (!accessToken || !isAdmin) return;
     setWorking(true); setError(null); setNotice("");
     try {
-      setSession(await api.openCashSession(accessToken, openingCash, note.trim() || undefined));
+      const opened = await api.openCashSession(accessToken, openingCash, note.trim() || undefined);
+      setSession(opened);
       setCountedCash(0); setNote(""); setNotice("La caja quedó abierta.");
+      onOpened?.(opened);
     } catch (caught) { setError(caught); }
     finally { setWorking(false); }
   };
@@ -63,7 +69,7 @@ export function CashRegisterPage() {
     finally { setWorking(false); }
   };
 
-  return <div className="space-y-6"><Panel title="Cierre de caja diario" description="Consulta el estado y, como administrador, registra el arqueo y el cierre.">
+  return <div className="space-y-6"><Panel title={onOpened ? "Abrir caja para vender" : "Cierre de caja diario"} description={onOpened ? "Al abrir la caja regresarás automáticamente a la venta." : "Consulta el estado y, como administrador, registra el arqueo y el cierre."}>
     <div className="space-y-5">
       {error !== null && <ErrorNotice error={error} />}{notice && <Notice tone="success">{notice}</Notice>}
       {loading ? <p className="py-8 text-center text-sm text-slate-500">Consultando caja…</p> : !session ? <>
@@ -96,7 +102,7 @@ export function CashRegisterPage() {
       {!isAdmin && <p className="text-xs text-slate-500">La apertura y el cierre están disponibles solo para administración.</p>}
       {!loading && <Button variant="secondary" onClick={() => void reload()}>Actualizar estado</Button>}
     </div>
-  </Panel>{isAdmin && <Panel title="Historial de cierres" description="Consulta los arqueos registrados por fecha.">
+  </Panel>{isAdmin && !onOpened && <Panel title="Historial de cierres" description="Consulta los arqueos registrados por fecha.">
     <div className="flex flex-wrap items-end gap-3"><Field label="Desde" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required /><Field label="Hasta" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} required /><Button disabled={working || endDate < startDate} onClick={() => void loadHistory()}>Buscar cierres</Button></div>
     {history.length === 0 ? <p className="mt-5 text-sm text-slate-500">No hay cierres para mostrar en el rango seleccionado.</p> : <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">Fecha</th><th className="py-2">Ventas efectivo</th><th className="py-2">Contado</th><th className="py-2">Diferencia</th><th className="py-2">Notas</th></tr></thead><tbody className="divide-y divide-slate-100">{history.map((closed) => <tr key={closed.id}><td className="py-3">{closed.closed_at ? new Date(closed.closed_at).toLocaleString("es-CO") : "—"}</td><td>{formatCop(closed.sales_cash_cop)}</td><td>{closed.counted_cash_cop == null ? "—" : formatCop(closed.counted_cash_cop)}</td><td>{closed.difference_cash_cop == null ? "—" : formatCop(closed.difference_cash_cop)}</td><td className="max-w-64 truncate">{closed.closing_note || "—"}</td></tr>)}</tbody></table></div>}
   </Panel>}</div>;
