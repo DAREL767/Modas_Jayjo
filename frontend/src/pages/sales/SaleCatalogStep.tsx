@@ -2,11 +2,10 @@ import { useRef } from "react";
 import type { Product } from "../../api/types";
 import { Button, Field, formatCop } from "../../components/Panel";
 import { CameraScanButton } from "../../components/CameraScanner";
-
-type CartItem = { product: Product; quantity: number };
+import type { CartItem, saleAmounts } from "./amounts";
 
 export function SaleCatalogStep({
-  products, cart, search, onSearchChange, onAdd, onRemove, onContinue,
+  products, cart, search, onSearchChange, onAdd, onRemove, onContinue, onDiscount, amounts,
 }: {
   products: Product[];
   cart: CartItem[];
@@ -15,6 +14,8 @@ export function SaleCatalogStep({
   onAdd: (product: Product) => void;
   onRemove: (product: Product) => void;
   onContinue: () => void;
+  onDiscount: (product: Product) => void;
+  amounts: ReturnType<typeof saleAmounts>;
 }) {
   const searchInput = useRef<HTMLInputElement>(null);
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
@@ -34,7 +35,6 @@ export function SaleCatalogStep({
     onSearchChange("");
     searchInput.current?.focus();
   };
-  const total = cart.reduce((sum, item) => sum + item.product.unit_price_cop * item.quantity, 0);
 
   return (
     <section className="sale-card">
@@ -44,12 +44,14 @@ export function SaleCatalogStep({
           <div className="sale-cart-list" aria-live="polite">
             {cart.length === 0 ? (
               <p className="sale-empty-cart">Agrega prendas para iniciar la venta.</p>
-            ) : cart.map(({ product, quantity }) => (
+            ) : cart.map(({ product, quantity, unitDiscountCop }) => (
               <article className="sale-cart-item" key={product.id}>
                 <div className="sale-garment-icon" aria-hidden="true">👕</div>
                 <div className="sale-cart-description">
                   <strong>{product.name}</strong>
                   <span>{product.size} · {product.color} · {formatCop(product.unit_price_cop)}</span>
+                  <button type="button" className="sale-discount-button" onClick={() => onDiscount(product)}>Descuento de {product.name}: {formatCop(unitDiscountCop)} / unidad</button>
+                  <span>Total: {formatCop((product.unit_price_cop - unitDiscountCop) * quantity)}</span>
                 </div>
                 <div className="sale-quantity-control" aria-label={"Cantidad de " + product.name}>
                   <button type="button" aria-label={"Quitar una unidad de " + product.name} onClick={() => onRemove(product)}>−</button>
@@ -59,13 +61,10 @@ export function SaleCatalogStep({
               </article>
             ))}
           </div>
-          <div className="sale-total-chip">TOTAL: {formatCop(total)}</div>
+          <div className="sale-total-chip">TOTAL: {formatCop(amounts.total)}</div>
         </div>
 
         <div className="sale-search-column">
-          <div className="sale-search-illustration" aria-hidden="true">
-            <span>🏷️</span><span className="sale-scan-line" />
-          </div>
           <Field ref={searchInput} label="Buscar por nombre o código" placeholder="Nombre, variante o código / número de serie (SKU)" value={search} onChange={(event) => onSearchChange(event.target.value)} onKeyDown={(event) => {
             if (event.key !== "Enter") return;
             event.preventDefault();
@@ -73,6 +72,11 @@ export function SaleCatalogStep({
           }} autoComplete="off" autoFocus />
           <p className="sale-search-hint">Selecciona la variante correcta para agregarla al carrito.</p>
           <CameraScanButton onDetected={onSearchChange} />
+          <div className="sale-discount-summary">
+            <h3 className="sale-section-title">Resumen de la venta</h3>
+            <dl><div><dt>Subtotal</dt><dd>{formatCop(amounts.subtotal)}</dd></div><div><dt>Descuentos</dt><dd>− {formatCop(amounts.discount)}</dd></div><div><dt>Total a pagar</dt><dd>{formatCop(amounts.total)}</dd></div></dl>
+            <p>El descuento de cada prenda empieza en $0. Puedes cambiarlo desde el carrito. Si todas siguen en $0, confirmarás el descuento global antes de cobrar.</p>
+          </div>
           {normalizedSearch && (
             <div className="sale-search-results" role="list" aria-label="Prendas encontradas">
               {matches.length === 0 ? <p className="sale-no-results">No encontramos prendas disponibles con esa búsqueda.</p> : matches.map((product) => (

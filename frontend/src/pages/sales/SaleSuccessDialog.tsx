@@ -9,6 +9,7 @@ export function SaleSuccessDialog({ sale, onReturn }: { sale: Sale; onReturn: ()
         <h2 id="sale-success-title">¡Venta registrada!</h2>
         <p>Detalles de la venta</p>
         <dl>
+          {sale.subtotal_cop != null && <><div><dt>Subtotal</dt><dd>{formatCop(sale.subtotal_cop)}</dd></div><div><dt>Descuentos</dt><dd>{formatCop(sale.discount_cop ?? 0)}</dd></div></>}
           <div><dt>Total</dt><dd>{formatCop(sale.total_cop)}</dd></div>
           <div><dt>Recibido</dt><dd>{formatCop(sale.cash_received_cop)}</dd></div>
           <div><dt>Devuelta</dt><dd>{formatCop(sale.change_cop)}</dd></div>

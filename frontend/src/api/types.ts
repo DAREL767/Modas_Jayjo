@@ -55,8 +55,9 @@ export interface ProductUpdate {
 }
 
 export interface SaleRequest {
-  items: Array<{ product_id: string; quantity: number }>;
+  items: Array<{ product_id: string; quantity: number; unit_discount_cop?: number }>;
   cash_received_cop: number;
+  global_discount_cop?: number;
 }
 
 export interface SaleLine {
@@ -68,6 +69,7 @@ export interface SaleLine {
   quantity: number;
   unit_price_cop: number;
   line_total_cop: number;
+  unit_discount_cop?: number;
 }
 
 export interface Sale {
@@ -75,6 +77,9 @@ export interface Sale {
   status: "completed";
   items: SaleLine[];
   total_cop: number;
+  subtotal_cop?: number | null;
+  discount_cop?: number;
+  global_discount_cop?: number;
   cash_received_cop: number;
   change_cop: number;
   cashier_id: string;

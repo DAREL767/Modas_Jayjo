@@ -47,6 +47,7 @@ describe("SalesPage sequential flow", () => {
     fireEvent.change(await screen.findByLabelText("Buscar por nombre o código"), { target: { value: "SKU-001" } });
     fireEvent.click(await screen.findByRole("button", { name: "Agregar" }));
     fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Procesar Pago" })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
@@ -103,6 +104,7 @@ describe("SalesPage sequential flow", () => {
     fireEvent.change(input, { target: { value: "SKU-001" } });
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
     fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Abrir caja" }));
     await screen.findByLabelText("Buscar por nombre o código");
@@ -128,6 +130,50 @@ describe("SalesPage sequential flow", () => {
     expect(screen.getByText("Agrega prendas para iniciar la venta.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
     expect(screen.getByRole("button", { name: "Proceder al cobro" })).toBeEnabled();
+  });
+
+  it("confirms a global discount in pesos and sends the net payment", async () => {
+    const create = vi.spyOn(api, "createSale").mockResolvedValue(sale);
+    render(<SalesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Escanear código" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
+    expect(screen.getByLabelText("Descuento global (COP)")).toHaveValue(0);
+    fireEvent.change(screen.getByLabelText("Descuento global (COP)"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(80000);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith("test-token", { items: [{ product_id: product.id, quantity: 1 }], cash_received_cop: 80000, global_discount_cop: 5000 }, expect.any(String)));
+  });
+
+  it("applies the discount to every unit and skips global discounts when a line is discounted", async () => {
+    const create = vi.spyOn(api, "createSale").mockResolvedValue(sale);
+    render(<SalesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Escanear código" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Descuento de Camisa azul/ }));
+    fireEvent.change(screen.getByLabelText("Descuento por unidad (COP)"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar descuento" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar una unidad de Camisa azul" }));
+    fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
+    expect(screen.queryByLabelText("Descuento global (COP)")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(160000);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith("test-token", { items: [{ product_id: product.id, quantity: 2, unit_discount_cop: 5000 }], cash_received_cop: 160000 }, expect.any(String)));
+  });
+
+  it("removing and readding a garment resets its discount to zero", async () => {
+    render(<SalesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Escanear código" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Descuento de Camisa azul/ }));
+    fireEvent.change(screen.getByLabelText("Descuento por unidad (COP)"), { target: { value: "5000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar descuento" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quitar una unidad de Camisa azul" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escanear código" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Descuento de Camisa azul/ }));
+    expect(screen.getByLabelText("Descuento por unidad (COP)")).toHaveValue(0);
   });
 
   it("narrows suggestions by name and variant terms in any order without accents", async () => {

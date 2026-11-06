@@ -20,9 +20,11 @@
 .sale-quantity-control button:disabled { opacity: .45; }
 .sale-total-chip { display: table; margin: .6rem 0 0 auto; border-radius: .4rem; background: #c7e3ff; padding: .3rem .65rem; font-weight: 750; }
 .sale-search-column { display: grid; align-content: start; gap: .65rem; }
-.sale-search-illustration { display: grid; min-height: 9rem; place-items: center; position: relative; overflow: hidden; border-radius: .25rem; background: linear-gradient(140deg, #e8e5dc, #c5d7e9 55%, #f5eadb); }
-.sale-search-illustration span:first-child { font-size: 4rem; filter: drop-shadow(0 5px 4px #5555); }
-.sale-scan-line { position: absolute; left: 2%; right: 2%; height: 2px; background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.sale-discount-button { justify-self: start; color: #275d89; text-align: left; font-size: .78rem; text-decoration: underline; text-underline-offset: 3px; padding: .35rem 0; }
+.sale-discount-summary { border: 1px solid #dbe2ea; border-radius: 1rem; background: #f7faff; padding: 1rem; }
+.sale-discount-summary dl > div, dl.sale-discount-summary > div { display: flex; justify-content: space-between; gap: 1rem; margin: .35rem 0; }
+.sale-discount-summary dd { font-weight: 650; white-space: nowrap; }
+.sale-discount-summary p { margin-top: .8rem; color: #64748b; font-size: .8rem; line-height: 1.5; }
 .sale-search-hint, .sales-register-hint { margin: 0; color: #64748b; font-size: .8rem; }
 .sale-search-results { display: grid; gap: .5rem; max-height: 15rem; overflow: auto; }
 .sale-product-result { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border: 1px solid #dbe2ea; border-radius: .8rem; padding: .7rem; }

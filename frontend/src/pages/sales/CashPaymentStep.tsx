@@ -3,9 +3,11 @@ import { Button, Field, formatCop } from "../../components/Panel";
 const QUICK_CASH_AMOUNTS = [20_000, 50_000, 100_000];
 
 export function CashPaymentStep({
-  total, cashReceived, error, working, onCashReceivedChange, onBack, onConfirm,
+  total, subtotal, discount, cashReceived, error, working, onCashReceivedChange, onBack, onConfirm,
 }: {
   total: number;
+  subtotal: number;
+  discount: number;
   cashReceived: number;
   error: unknown;
   working: boolean;
@@ -21,6 +23,7 @@ export function CashPaymentStep({
       <div className="sale-payment-total"><span>Total a pagar</span><strong>{formatCop(total)}</strong></div>
       {errorMessage && <div className="sale-inline-error" role="alert">{errorMessage}</div>}
       <div className="sale-payment-content">
+        <dl className="sale-discount-summary"><div><dt>Subtotal</dt><dd>{formatCop(subtotal)}</dd></div><div><dt>Descuentos</dt><dd>− {formatCop(discount)}</dd></div></dl>
         <Field label="Efectivo recibido" type="number" inputMode="numeric" min={total} max={2_000_000_000} step="1" value={cashReceived || ""} onChange={(event) => onCashReceivedChange(Number(event.target.value))} placeholder="Ingresa el valor recibido" required />
         <div className="sale-quick-cash">
           <p>Billetes rápidos</p>
