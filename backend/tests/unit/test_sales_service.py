@@ -3,6 +3,7 @@ import pytest
 from app.modules.cash_register.errors import CashSessionNotOpenError
 from app.modules.inventory.errors import InsufficientStockError
 from app.modules.sales.errors import (
+    InvalidSaleDiscountError,
     DuplicateIdempotencyKeyError,
     InsufficientCashReceivedError,
     IdempotencyKeyConflictError,
@@ -176,3 +177,52 @@ async def test_sale_calculates_cash_change_and_rejects_short_payment():
     assert sales.sales == {}
     assert inventory.product["stock_quantity"] == 10
     assert sessions.total_by_payment["cash"] == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("unit_discount, global_discount, expected_total", [(3000, 0, 44000), (0, 7000, 43000), (25000, 0, 0), (0, 50000, 0), (0, 0, 50000)])
+async def test_discounts_use_server_price_and_net_cash_total(unit_discount, global_discount, expected_total):
+    service, _, inventory, sessions = make_service()
+    request = SaleCreate(items=[{"product_id": PRODUCT_ID, "quantity": 2, "unit_discount_cop": unit_discount}], global_discount_cop=global_discount, cash_received_cop=60000)
+    result = await service.create_sale(request, actor_id="vendor", idempotency_key="discount-request")
+    assert result["subtotal_cop"] == 50000
+    assert result["discount_cop"] == 50000 - expected_total
+    assert result["global_discount_cop"] == global_discount
+    assert result["total_cop"] == expected_total
+    assert result["change_cop"] == 60000 - expected_total
+    assert result["items"][0]["unit_price_cop"] == 25000
+    assert result["items"][0]["unit_discount_cop"] == unit_discount
+    assert result["items"][0]["line_total_cop"] == (25000 - unit_discount) * 2
+    assert inventory.product["stock_quantity"] == 8
+    assert sessions.total_by_payment["cash"] == expected_total
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("unit_discount, global_discount", [(25001, 0), (0, 50001)])
+async def test_excessive_discounts_do_not_mutate_stock_or_cash(unit_discount, global_discount):
+    service, sales, inventory, sessions = make_service()
+    request = SaleCreate(items=[{"product_id": PRODUCT_ID, "quantity": 2, "unit_discount_cop": unit_discount}], global_discount_cop=global_discount, cash_received_cop=50000)
+    with pytest.raises(InvalidSaleDiscountError):
+        await service.create_sale(request, actor_id="vendor", idempotency_key="bad-discount")
+    assert sales.sales == {}
+    assert inventory.product["stock_quantity"] == 10
+    assert sessions.total_by_payment["cash"] == 0
+
+
+@pytest.mark.parametrize("unit_discount, global_discount", [(-1, 0), (0, -1), (1.5, 0), (0, 2.5), (1, 1)])
+def test_discount_contract_rejects_negative_fractional_or_combined_discounts(unit_discount, global_discount):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        SaleCreate(items=[{"product_id": PRODUCT_ID, "quantity": 1, "unit_discount_cop": unit_discount}], global_discount_cop=global_discount, cash_received_cop=50000)
+
+
+@pytest.mark.anyio
+async def test_discount_changes_participate_in_idempotency():
+    service, _, inventory, sessions = make_service()
+    request = SaleCreate(items=[{"product_id": PRODUCT_ID, "quantity": 2}], global_discount_cop=5000, cash_received_cop=50000)
+    first = await service.create_sale(request, actor_id="vendor", idempotency_key="discount-retry")
+    assert await service.create_sale(request, actor_id="vendor", idempotency_key="discount-retry") == first
+    with pytest.raises(IdempotencyKeyConflictError):
+        await service.create_sale(request.model_copy(update={"global_discount_cop": 6000}), actor_id="vendor", idempotency_key="discount-retry")
+    assert inventory.product["stock_quantity"] == 8
+    assert sessions.total_by_payment["cash"] == 45000

@@ -12,6 +12,7 @@ from app.modules.sales.errors import (
     IdempotencyKeyConflictError,
     ProductPriceChangedError,
     SaleTotalTooLargeError,
+    InvalidSaleDiscountError,
 )
 from app.modules.sales.schemas import SaleCreate, SaleResponse
 from app.modules.sales.service import SalesService
@@ -24,6 +25,8 @@ require_staff = require_roles([UserRole.ADMIN, UserRole.VENDOR])
 
 
 def _raise_http_error(error: Exception) -> None:
+    if isinstance(error, InvalidSaleDiscountError):
+        raise HTTPException(status_code=422, detail="El descuento no puede superar el precio de la prenda ni el subtotal de la venta") from error
     if isinstance(error, ProductNotFoundError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -88,5 +91,6 @@ async def create_sale(
         ProductNotFoundError,
         ProductPriceChangedError,
         SaleTotalTooLargeError,
+        InvalidSaleDiscountError,
     ) as error:
         _raise_http_error(error)

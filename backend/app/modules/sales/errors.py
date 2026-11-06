@@ -24,3 +24,7 @@ class InsufficientCashReceivedError(SaleError):
 
 class SaleNotFoundError(SaleError):
     pass
+
+
+class InvalidSaleDiscountError(SaleError):
+    pass

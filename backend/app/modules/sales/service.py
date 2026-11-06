@@ -11,6 +11,7 @@ from app.modules.sales.errors import (
     IdempotencyKeyConflictError,
     ProductPriceChangedError,
     SaleTotalTooLargeError,
+    InvalidSaleDiscountError,
 )
 from app.modules.sales.ports import (
     SaleCashSessionPort,
@@ -39,7 +40,7 @@ class SalesService:
     ) -> dict:
         request_hash = hashlib.sha256(
             json.dumps(
-                data.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+                data.model_dump(mode="json", exclude_defaults=True), sort_keys=True, separators=(",", ":")
             ).encode("utf-8")
         ).hexdigest()
 
@@ -50,6 +51,7 @@ class SalesService:
 
             line_items = []
             total = 0
+            subtotal = 0
             for requested in data.items:
                 product = await self._inventory.get_by_id(
                     requested.product_id, session=session
@@ -59,7 +61,10 @@ class SalesService:
                 if product["stock_quantity"] < requested.quantity:
                     raise InsufficientStockError
                 unit_price = product["unit_price_cop"]
-                line_total = unit_price * requested.quantity
+                if requested.unit_discount_cop > unit_price:
+                    raise InvalidSaleDiscountError
+                subtotal += unit_price * requested.quantity
+                line_total = (unit_price - requested.unit_discount_cop) * requested.quantity
                 total += line_total
                 line_items.append(
                     {
@@ -70,9 +75,13 @@ class SalesService:
                         "color": product["color"],
                         "quantity": requested.quantity,
                         "unit_price_cop": unit_price,
+                        "unit_discount_cop": requested.unit_discount_cop,
                         "line_total_cop": line_total,
                     }
                 )
+            if data.global_discount_cop > total:
+                raise InvalidSaleDiscountError
+            total -= data.global_discount_cop
             if total > 2_000_000_000:
                 raise SaleTotalTooLargeError
             if data.cash_received_cop < total:
@@ -85,6 +94,9 @@ class SalesService:
                 "status": "completed",
                 "items": line_items,
                 "total_cop": total,
+                "subtotal_cop": subtotal,
+                "discount_cop": subtotal - total,
+                "global_discount_cop": data.global_discount_cop,
                 "cash_received_cop": data.cash_received_cop,
                 "change_cop": data.cash_received_cop - total,
                 "cashier_id": actor_id,

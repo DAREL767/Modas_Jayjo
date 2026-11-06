@@ -40,6 +40,12 @@ La conexión asíncrona se administra con `AsyncMongoClient` de PyMongo y vive d
 
 ## Base POS (inventario, ventas y caja)
 
+### Descuentos de ventas (CR-036)
+
+`POST /api/sales/` admite `unit_discount_cop` opcional por línea y `global_discount_cop` opcional por venta, ambos enteros no negativos con valor predeterminado cero. El descuento unitario no supera el precio del servidor y el global no supera el subtotal; no pueden combinarse descuentos unitarios positivos con uno global positivo. El total puede ser cero si el descuento cubre el precio completo.
+
+La venta conserva `subtotal_cop`, `discount_cop`, `global_discount_cop` y `unit_discount_cop` por línea; `line_total_cop` es el neto de esa línea antes de un eventual descuento global. Caja recibe el total neto y el cambio se calcula sobre ese total. Descuentos negativos, fraccionarios, excesivos o combinados se rechazan antes de escribir movimientos. Para registros históricos, los nuevos campos de respuesta tienen valores compatibles. El hash de idempotencia incluye descuentos distintos de cero y mantiene el formato anterior para ventas sin descuento.
+
 La API POS inicial está organizada por módulos (`inventory`, `sales` y `cash_register`). Los endpoints requieren un JWT válido. Admin y vendor pueden consultar inventario activo, consultar la caja actual y registrar ventas. Solo admin puede crear/editar/desactivar prendas, ajustar existencias y abrir o cerrar caja. Los vendedores no reciben el costo interno de las prendas.
 
 - `GET /api/inventory/` y `GET /api/inventory/{product_id}` consultan prendas. Admin puede incluir inactivas con `active_only=false`.

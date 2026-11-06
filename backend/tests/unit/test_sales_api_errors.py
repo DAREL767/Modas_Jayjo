@@ -5,6 +5,13 @@ from app.modules.cash_register.errors import CashSessionNotOpenError
 from app.modules.inventory.errors import InsufficientStockError
 from app.modules.sales.errors import IdempotencyKeyConflictError, ProductPriceChangedError
 from app.modules.sales.router import _raise_http_error
+from app.modules.sales.errors import InvalidSaleDiscountError
+
+
+def test_invalid_discount_returns_validation_error():
+    with pytest.raises(HTTPException) as caught:
+        _raise_http_error(InvalidSaleDiscountError())
+    assert caught.value.status_code == 422
 
 
 @pytest.mark.parametrize(
