@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, Notice } from "../components/Panel";
+import logo from "../assets/logos/logo-empresa.png";
 
 export function LoginPage({ googleConfigured }: { googleConfigured: boolean }) {
   const {
@@ -26,9 +27,7 @@ export function LoginPage({ googleConfigured }: { googleConfigured: boolean }) {
     <main className="login-background grid min-h-screen place-items-center px-4 py-8">
       <div className="w-full max-w-6xl">
         <section className="login-card mx-auto flex min-h-[380px] w-full max-w-5xl flex-col items-center justify-center rounded-[2rem] border border-white bg-white/95 px-6 py-10 text-center sm:min-h-[430px] sm:px-12">
-          <div className="brand-splash grid size-24 place-items-center rounded-full text-white">
-            <span className="text-center text-sm font-black leading-tight">MODAS<br />JAYJO</span>
-          </div>
+          <img src={logo} alt="Modas Jayjo" className="h-32 w-36 object-contain" />
           <h1 className="mt-6 text-4xl font-medium tracking-tight text-slate-900 sm:text-5xl">Bienvenido</h1>
           <p className="mt-1 text-base text-slate-600 sm:text-lg">Sistema de Inventario y Punto de Venta</p>
           <div className="mt-12 w-full max-w-md space-y-4">
