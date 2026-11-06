@@ -30,6 +30,14 @@ El workflow de GitHub ejecuta estos pasos en cada pull request que cambie `front
 
 ## Contrato y autorización
 
+### Dashboards por rol (CR-032)
+
+El inicio de operación ofrece ventas e inventario a ambos roles. Administración tiene un selector de áreas en la cabecera para consultar su dashboard de gestión; el vendedor no ve ese selector. Volver al inicio conserva el área de origen, y salir de la sesión reinicia la navegación.
+
+Gestión y Finanzas abre por ahora el inventario existente, donde administración gestiona precios y costos. Caja y Personal conservan sus módulos actuales. Métricas del día y Reportes de Novedades muestran «Próximamente», sin cifras ficticias ni navegación a pantallas inexistentes. La separación futura en pasos secuenciales queda fuera de este cambio.
+
+Los recursos gráficos entregados se importan desde `src/assets/icons/` y `src/assets/logos/`; el logo se utiliza también en el inicio de sesión.
+
 La interfaz consume rutas bajo `/api`: autenticación Google y `/me`, inventario, ventas, caja y usuarios. El backend valida permisos en cada solicitud; la visibilidad de módulos en la interfaz solo mejora la navegación y no sustituye la autorización del servidor.
 
 El vendor puede consultar existencias y registrar ventas. El admin también administra prendas, usuarios y cierres de caja. El costo unitario solo se presenta para admin cuando la API lo devuelve.
