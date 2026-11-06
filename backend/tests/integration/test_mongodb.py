@@ -79,8 +79,17 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         assert await repository.get_by_id(str(created["_id"])) is not None
         assert await repository.exists_by_username_or_email(username, email)
         google_subject = f"google_{uuid4().hex}"
+        assert await repository.link_google_subject(
+            str(created["_id"]), google_subject,
+            expected_email="changed@example.invalid", expected_session_version=None,
+        ) is None
+        assert await repository.link_google_subject(
+            str(created["_id"]), google_subject,
+            expected_email=email, expected_session_version="stale-version",
+        ) is None
         linked = await repository.link_google_subject(
-            str(created["_id"]), google_subject
+            str(created["_id"]), google_subject,
+            expected_email=email, expected_session_version=None,
         )
         assert linked["google_sub"] == google_subject
         assert "password" not in linked
@@ -97,6 +106,7 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         assert await repository.deactivate_by_id(str(created["_id"]))
         deactivated = await repository.get_by_id(str(created["_id"]))
         assert deactivated["is_active"] is False
+        assert deactivated["session_version"]
         assert await repository.list_all(is_active=False, limit=10)
 
         legacy_vendor = await repository.create(

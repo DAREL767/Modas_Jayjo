@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/endpoints";
-import type { User, UserCreate, UserRole } from "../api/types";
+import type { User, UserCreate, UserRole, UserUpdate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, Notice, Panel } from "../components/Panel";
+import { Modal } from "../components/Modal";
 
 const emptyUser: UserCreate = { username: "", email: "", full_name: "", password: "", role: "vendor" };
 
 export function UsersPage() {
-  const { accessToken, user: currentUser } = useAuth();
+  const { accessToken, user: currentUser, signOut } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [draft, setDraft] = useState<UserCreate>(emptyUser);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState("");
+  const [editing, setEditing] = useState<User | null>(null);
+  const [editDraft, setEditDraft] = useState({ username: "", email: "", full_name: "", password: "" });
+  const [editError, setEditError] = useState<unknown>(null);
 
   const reload = useCallback(async () => {
     if (!accessToken) return;
@@ -23,6 +27,28 @@ export function UsersPage() {
     finally { setLoading(false); }
   }, [accessToken]);
   useEffect(() => { void reload(); }, [reload]);
+
+  const saveUser = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accessToken || !editing) return;
+    const changes: UserUpdate = {};
+    for (const key of ["username", "email", "full_name"] as const) {
+      const value = key === "full_name" ? editDraft[key].trim() : editDraft[key].trim().toLowerCase();
+      if (value !== editing[key]) changes[key] = value;
+    }
+    if (editDraft.password) changes.password = editDraft.password;
+    if (!Object.keys(changes).length) { setEditing(null); return; }
+    const critical = Boolean(changes.username || changes.email || changes.password);
+    setWorking(true); setEditError(null);
+    try {
+      await api.updateUser(accessToken, editing.id, changes);
+      setEditing(null); setEditDraft({ username: "", email: "", full_name: "", password: "" });
+      if (critical && editing.id === currentUser?.id) { signOut(); return; }
+      setNotice(critical ? "Cuenta actualizada. Sus sesiones anteriores se invalidaron; debe iniciar sesión de nuevo." : "Los datos de la cuenta se actualizaron.");
+      await reload();
+    } catch (caught) { setEditError(caught); }
+    finally { setWorking(false); }
+  };
 
   const create = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -73,7 +99,7 @@ export function UsersPage() {
               <td className="px-4 py-3 font-mono text-xs">{member.username}</td>
               <td className="px-4 py-3"><select aria-label={`Rol de ${member.full_name}`} disabled={working || isSelf || !member.is_active} value={member.role} onChange={(event) => void setRole(member, event.target.value as UserRole)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2"><option value="admin">Administrador</option><option value="vendor">Vendedor</option></select></td>
               <td className="px-4 py-3">{member.is_active ? "Activa" : "Inactiva"}</td>
-              <td className="px-4 py-3">{member.is_active ? <Button variant="danger" className="min-h-9 px-3 text-xs" disabled={working || isSelf} onClick={() => void deactivate(member)}>{isSelf ? "Cuenta actual" : "Desactivar"}</Button> : <Button className="min-h-9 px-3 text-xs" disabled={working} onClick={() => void reactivate(member)}>Reactivar</Button>}</td>
+              <td className="px-4 py-3"><div className="flex gap-2"><Button variant="secondary" disabled={working} onClick={() => { setEditing(member); setEditError(null); setEditDraft({ username: member.username, email: member.email, full_name: member.full_name, password: "" }); }}>Editar</Button>{member.is_active ? <Button variant="danger" className="min-h-9 px-3 text-xs" disabled={working || isSelf} onClick={() => void deactivate(member)}>{isSelf ? "Cuenta actual" : "Desactivar"}</Button> : <Button className="min-h-9 px-3 text-xs" disabled={working} onClick={() => void reactivate(member)}>Reactivar</Button>}</div></td>
             </tr>;
           })}</tbody>
         </table></div>}
@@ -90,5 +116,19 @@ export function UsersPage() {
         <div className="flex items-end"><Button type="submit" disabled={working}>{working ? "Creando…" : "Crear cuenta"}</Button></div>
       </form>
     </Panel>
+    {editing && <Modal titleId="edit-user-title" onClose={() => { if (!working) setEditing(null); }}>
+      <form className="space-y-4" onSubmit={saveUser}>
+        <h2 id="edit-user-title" className="text-xl font-bold">Editar cuenta de {editing.full_name}</h2>
+        <p className="text-sm text-slate-600">Cambiar usuario, correo o contraseña cerrará las sesiones de esta cuenta. Si cambias el correo, tendrá que vincular Google con el nuevo correo.</p>
+        {editing.id === currentUser?.id && <Notice tone="info">Estás editando tu cuenta. Si cambias tus credenciales volverás al inicio de sesión.</Notice>}
+        {editError !== null && <ErrorNotice error={editError} />}
+        <Field label="Nombre completo de la cuenta" value={editDraft.full_name} maxLength={120} required onChange={(event) => setEditDraft({ ...editDraft, full_name: event.target.value })} />
+        <Field label="Usuario de la cuenta" value={editDraft.username} minLength={3} maxLength={50} required autoComplete="off" onChange={(event) => setEditDraft({ ...editDraft, username: event.target.value })} />
+        <Field label="Correo de la cuenta" type="email" value={editDraft.email} required onChange={(event) => setEditDraft({ ...editDraft, email: event.target.value })} />
+        <Field label="Nueva contraseña (opcional)" type="password" value={editDraft.password} minLength={8} autoComplete="new-password" onChange={(event) => setEditDraft({ ...editDraft, password: event.target.value })} />
+        <p className="text-xs text-slate-500">Deja la contraseña vacía para conservar la actual.</p>
+        <div className="flex justify-end gap-3"><Button type="button" variant="secondary" disabled={working} onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit" disabled={working}>{working ? "Guardando…" : "Guardar cambios"}</Button></div>
+      </form>
+    </Modal>}
   </div>;
 }

@@ -1,4 +1,5 @@
 from typing import Any
+from uuid import uuid4
 
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -32,18 +33,19 @@ class UserRepository:
         )
 
     async def link_google_subject(
-        self, user_id: str, subject: str
+        self, user_id: str, subject: str, *, expected_email: str | None = None,
+        expected_session_version: str | None = None,
     ) -> UserDocument | None:
+        query = {
+            "_id": self._object_id(user_id),
+            "is_active": {"$ne": False},
+            "$or": [{"google_sub": {"$exists": False}}, {"google_sub": None}],
+        }
+        if expected_email is not None:
+            query.update(email=expected_email, session_version=expected_session_version)
         try:
             return await self._users().find_one_and_update(
-                {
-                    "_id": self._object_id(user_id),
-                    "is_active": {"$ne": False},
-                    "$or": [
-                        {"google_sub": {"$exists": False}},
-                        {"google_sub": None},
-                    ],
-                },
+                query,
                 {"$set": {"google_sub": subject}},
                 return_document=ReturnDocument.AFTER,
                 projection={"password": 0},
@@ -106,7 +108,7 @@ class UserRepository:
     async def deactivate_by_id(self, user_id: str) -> bool:
         result = await self._users().update_one(
             {"_id": self._object_id(user_id), "is_active": {"$ne": False}},
-            {"$set": {"is_active": False}},
+            {"$set": {"is_active": False, "session_version": uuid4().hex}},
         )
         if result.matched_count:
             return True

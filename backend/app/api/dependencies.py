@@ -65,14 +65,25 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        username = decode_access_token(token).get("sub")
+        payload = decode_access_token(token)
+        username = payload.get("sub")
         if username is None:
             raise credentials_exception
     except InvalidTokenError:
         raise credentials_exception
 
-    user = await UserRepository().get_by_username(username)
+    user_id = payload.get("uid")
+    users = UserRepository()
+    user = (
+        await users.get_by_id(user_id)
+        if user_id else await users.get_by_username(username)
+    )
     if user is None:
+        raise credentials_exception
+    if (
+        payload.get("sv", "") != user.get("session_version", "")
+        or username != user["username"]
+    ):
         raise credentials_exception
     if not user.get("is_active", True):
         raise HTTPException(

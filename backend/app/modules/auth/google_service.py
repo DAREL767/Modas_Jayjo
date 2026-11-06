@@ -57,7 +57,8 @@ class GoogleAuthService:
 
         try:
             linked_user = await self._users.link_google_subject(
-                str(user["_id"]), subject
+                str(user["_id"]), subject, expected_email=email,
+                expected_session_version=user.get("session_version"),
             )
         except GoogleIdentityConflictError as exc:
             linked_user = await self._users.get_by_google_subject(subject)

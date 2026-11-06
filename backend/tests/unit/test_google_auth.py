@@ -31,7 +31,7 @@ class FakeUserRepository:
     async def get_by_google_subject(self, subject):
         return next((user for user in self.users if user.get("google_sub") == subject), None)
 
-    async def link_google_subject(self, user_id, subject):
+    async def link_google_subject(self, user_id, subject, **expected):
         linked = await self.get_by_google_subject(subject)
         if linked is not None and str(linked["_id"]) != user_id:
             raise GoogleIdentityConflictError

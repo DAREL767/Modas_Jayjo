@@ -28,7 +28,10 @@ router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
 def _create_token_response(user: dict) -> Token:
     access_token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]}
+        data={
+            "sub": user["username"], "uid": str(user["_id"]),
+            "role": user["role"], "sv": user.get("session_version", ""),
+        }
     )
     return Token(access_token=access_token, token_type="bearer")
 
