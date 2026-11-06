@@ -22,6 +22,7 @@ export function InventoryPage() {
   const isAdmin = user?.role === "admin";
   const [products, setProducts] = useState<Product[]>([]);
   const [draft, setDraft] = useState<ProductCreate>(emptyProduct);
+  const [registering, setRegistering] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [delta, setDelta] = useState(1);
@@ -63,6 +64,8 @@ export function InventoryPage() {
     try {
       await api.createProduct(accessToken, draft);
       setDraft(emptyProduct);
+      setRegistering(false);
+      setSearch("");
       setNotice("La variante se guardó en el inventario.");
       await reload();
     } catch (caught) {
@@ -135,7 +138,7 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <Panel title="Inventario de prendas" description="Cada registro representa una variante de talla y color.">
+      {!registering && <Panel title="Inventario de prendas" description="Cada registro representa una variante de talla y color." action={<Button onClick={() => { setError(null); setNotice(""); setRegistering(true); }}>Agregar prenda</Button>}>
         <div className="space-y-4">
           <label className="block max-w-lg text-sm font-medium text-slate-700">
             Buscar por prenda, SKU, categoría o variante
@@ -166,9 +169,10 @@ export function InventoryPage() {
             </div>
           )}
         </div>
-      </Panel>
+      </Panel>}
 
-      <Panel title="Registrar nueva prenda" description="Cada registro representa una variante de talla y color. El stock inicial queda registrado como movimiento.">
+      {registering && <Panel title="Registrar nueva prenda" description="Cada registro representa una variante de talla y color. El stock inicial queda registrado como movimiento." action={<Button variant="secondary" disabled={working} onClick={() => { setError(null); setRegistering(false); }}>← Volver al inventario</Button>}>
+          {error !== null && <div className="mb-4"><ErrorNotice error={error} /></div>}
           <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={createProduct}>
             <Field label="SKU" value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value.toUpperCase() })} required />
             <div className="flex items-end"><CameraScanButton disabled={working} label="Escanear SKU de nueva prenda" onDetected={(sku) => setDraft((current) => ({ ...current, sku }))} /></div>
@@ -182,7 +186,7 @@ export function InventoryPage() {
             <Field label="Alerta de stock bajo" type="number" min="0" value={draft.low_stock_threshold} onChange={(event) => setDraft({ ...draft, low_stock_threshold: Number(event.target.value) })} required />
             <div className="flex items-end"><Button type="submit" disabled={working}>{working ? "Guardando…" : "Crear prenda"}</Button></div>
           </form>
-      </Panel>
+      </Panel>}
 
       {editing && (
         <div className="fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-product-title">

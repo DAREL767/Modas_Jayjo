@@ -15,6 +15,12 @@ it("uses scanned codes for an exact inventory lookup and for a new product SKU",
   fireEvent.click(screen.getByRole("button", { name: "Escanear para buscar" }));
   expect(screen.getByText("Jean niño")).toBeInTheDocument();
   expect(screen.queryByText("Otra prenda")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("SKU")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Agregar prenda" }));
+  expect(screen.queryByRole("button", { name: "Escanear para buscar" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Escanear SKU de nueva prenda" }));
   expect(screen.getByLabelText("SKU")).toHaveValue("NEW-001");
+  fireEvent.click(screen.getByRole("button", { name: /Volver al inventario/ }));
+  expect(screen.queryByLabelText("SKU")).not.toBeInTheDocument();
+  expect(screen.getByText("Jean niño")).toBeInTheDocument();
 });
