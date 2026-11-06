@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
+import { ApiError } from "../api/client";
 import type { CashSession, Product, Sale } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice } from "../components/Panel";
 import { CashPaymentStep } from "./sales/CashPaymentStep";
 import { SaleCatalogStep } from "./sales/SaleCatalogStep";
 import { SaleSuccessDialog } from "./sales/SaleSuccessDialog";
+import { CashRegisterPage } from "./CashRegisterPage";
 import "./sales/sales-flow.css";
 
 type CartItem = { product: Product; quantity: number };
@@ -24,6 +26,13 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const idempotencyKey = useRef<string | null>(null);
+  const [needsOpening, setNeedsOpening] = useState(false);
+  const resumeSale = useCallback((opened: CashSession) => {
+    setCashSession(opened);
+    setNeedsOpening(false);
+    setStep("catalog");
+    setError(null);
+  }, []);
 
   const reloadProducts = useCallback(async () => {
     if (!accessToken) return;
@@ -36,6 +45,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
       ]);
       setProducts(availableProducts);
       setCashSession(currentSession);
+      setNeedsOpening(currentSession?.status !== "open");
     } catch (caught) {
       setError(caught);
     } finally {
@@ -82,7 +92,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
 
   const startPayment = () => {
     if (!cashSession || cashSession.status !== "open") {
-      setError(new Error("No hay una caja abierta. Solicita al administrador que la abra antes de registrar ventas."));
+      setNeedsOpening(true);
       return;
     }
     setError(null);
@@ -111,6 +121,11 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
       await reloadProducts();
     } catch (caught) {
       setError(caught);
+      if (caught instanceof ApiError && caught.status === 409 && caught.detail === "No hay una sesión de caja abierta") {
+        setCashSession(null);
+        setNeedsOpening(true);
+        idempotencyKey.current = null;
+      }
     } finally {
       setWorking(false);
     }
@@ -134,7 +149,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
         <section className="sale-card sales-loading">Cargando prendas y estado de caja…</section>
       ) : (
         <>
-          {step === "catalog" ? (
+          {needsOpening ? <CashRegisterPage onOpened={resumeSale} /> : step === "catalog" ? (
             <>
               {error !== null && <div className="sales-flow-notice"><ErrorNotice error={error} /></div>}
               <SaleCatalogStep
@@ -158,7 +173,6 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
               onConfirm={() => void checkout()}
             />
           )}
-          {!cashSession && <p className="sales-register-hint">La caja debe estar abierta por un administrador antes de iniciar un cobro.</p>}
         </>
       )}
       {sale && <SaleSuccessDialog sale={sale} onReturn={returnToDashboard} />}

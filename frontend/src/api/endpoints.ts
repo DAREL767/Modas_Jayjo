@@ -12,6 +12,16 @@ import type {
   UserUpdate,
 } from "./types";
 
+async function listAll<T>(path: string, token: string): Promise<T[]> {
+  const items: T[] = [];
+  const separator = path.includes("?") ? "&" : "?";
+  for (let skip = 0; ; skip += 100) {
+    const page = await requestJson<T[]>(`${path}${separator}skip=${skip}&limit=100`, {}, token);
+    items.push(...page);
+    if (page.length < 100) return items;
+  }
+}
+
 export const api = {
   googleLogin: (credential: string, link?: { username: string; password: string }) =>
     requestJson<TokenResponse>("/api/auth/google", {
@@ -20,7 +30,7 @@ export const api = {
     }),
   currentUser: (token: string) => requestJson<User>("/api/auth/me", {}, token),
   inventory: (token: string, activeOnly = true) =>
-    requestJson<Product[]>(`/api/inventory/?active_only=${activeOnly}`, {}, token),
+    listAll<Product>(`/api/inventory/?active_only=${activeOnly}`, token),
   createProduct: (token: string, product: ProductCreate) =>
     requestJson<Product>(
       "/api/inventory/",
@@ -69,7 +79,7 @@ export const api = {
       {},
       token,
     ),
-  users: (token: string) => requestJson<User[]>("/api/users/", {}, token),
+  users: (token: string) => listAll<User>("/api/users/", token),
   createUser: (token: string, user: UserCreate) =>
     requestJson<User>("/api/users/", { method: "POST", body: JSON.stringify(user) }, token),
   updateUser: (token: string, id: string, changes: UserUpdate) =>

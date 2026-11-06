@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { Product } from "../../api/types";
 import { Button, Field, formatCop } from "../../components/Panel";
 
@@ -14,12 +15,24 @@ export function SaleCatalogStep({
   onRemove: (product: Product) => void;
   onContinue: () => void;
 }) {
-  const normalizedSearch = search.trim().toLocaleLowerCase("es");
+  const searchInput = useRef<HTMLInputElement>(null);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+  const normalizedSearch = normalize(search);
+  const available = products.filter((product) => product.is_active && product.stock_quantity > 0);
+  const exactCode = available.find((product) => product.sku.toUpperCase() === search.trim().toUpperCase());
   const matches = normalizedSearch
-    ? products.filter((product) => product.is_active && product.stock_quantity > 0)
-        .filter((product) => (product.name + " " + product.sku + " " + product.category + " " + product.size + " " + product.color).toLocaleLowerCase("es").includes(normalizedSearch))
-        .slice(0, 6)
+    ? (exactCode ? [exactCode] : available.filter((product) => {
+        const text = normalize([product.name, product.sku, product.category, product.size, product.color].join(" "));
+        return normalizedSearch.split(/\s+/).every((term) => text.includes(term));
+      }))
     : [];
+  const remaining = (product: Product) => product.stock_quantity - (cart.find((item) => item.product.id === product.id)?.quantity ?? 0);
+  const add = (product: Product) => {
+    if (remaining(product) <= 0) return;
+    onAdd(product);
+    onSearchChange("");
+    searchInput.current?.focus();
+  };
   const total = cart.reduce((sum, item) => sum + item.product.unit_price_cop * item.quantity, 0);
 
   return (
@@ -52,7 +65,11 @@ export function SaleCatalogStep({
           <div className="sale-search-illustration" aria-hidden="true">
             <span>🏷️</span><span className="sale-scan-line" />
           </div>
-          <Field label="Buscar por nombre o código" placeholder="Escribe el nombre o escanea el código de barras" value={search} onChange={(event) => onSearchChange(event.target.value)} autoComplete="off" autoFocus />
+          <Field ref={searchInput} label="Buscar por nombre o código" placeholder="Nombre, variante o código / número de serie (SKU)" value={search} onChange={(event) => onSearchChange(event.target.value)} onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            if (exactCode) add(exactCode);
+          }} autoComplete="off" autoFocus />
           <p className="sale-search-hint">Selecciona la variante correcta para agregarla al carrito.</p>
           {normalizedSearch && (
             <div className="sale-search-results" role="list" aria-label="Prendas encontradas">
@@ -61,11 +78,11 @@ export function SaleCatalogStep({
                   <div>
                     <strong>{product.name}</strong>
                     <span>{product.sku} · Talla {product.size} · {product.color}</span>
-                    <span className="sale-product-stock">Disponibles: {product.stock_quantity}</span>
+                    <span className="sale-product-stock">Disponibles: {remaining(product)}</span>
                   </div>
                   <div className="sale-result-action">
                     <strong>{formatCop(product.unit_price_cop)}</strong>
-                    <Button className="sale-add-button" onClick={() => onAdd(product)}>Agregar</Button>
+                    <Button className="sale-add-button" disabled={remaining(product) <= 0} onClick={() => add(product)}>Agregar</Button>
                   </div>
                 </article>
               ))}

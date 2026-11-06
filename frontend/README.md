@@ -21,6 +21,13 @@ npm run build
 
 El workflow de GitHub ejecuta estos pasos en cada pull request que cambie `frontend/`.
 
+## Flujos operativos (CR-030)
+
+- Personal permite desactivar y reactivar cuentas desde administración usando la misma identidad e historial. Las listas de personal e inventario recorren todas las páginas de la API (100 registros por solicitud).
+- Ventas busca por nombre, categoría, talla y color combinando términos en cualquier orden y sin distinguir tildes o mayúsculas. Un SKU exacto tiene prioridad. Las sugerencias se reducen al agregar términos.
+- El código de barras o número de serie debe estar registrado en el campo SKU de la variante. Se admiten lectores que escriben el código y envían Enter; no se usa cámara. Enter agrega únicamente una coincidencia exacta de SKU y nunca supera el stock. Después de agregar, el campo queda vacío y enfocado para el siguiente escaneo.
+- Al entrar a ventas sin caja abierta se muestra la apertura dentro del mismo flujo. Administración abre y regresa automáticamente al catálogo; vendedores solicitan la apertura a administración y pulsan «Actualizar estado» para continuar. Si caja se cierra durante el cobro, se conserva el carrito y se vuelve a solicitar apertura.
+
 ## Contrato y autorización
 
 La interfaz consume rutas bajo `/api`: autenticación Google y `/me`, inventario, ventas, caja y usuarios. El backend valida permisos en cada solicitud; la visibilidad de módulos en la interfaz solo mejora la navegación y no sustituye la autorización del servidor.

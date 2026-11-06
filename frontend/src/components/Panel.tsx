@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, PropsWithChildren, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentPropsWithRef, PropsWithChildren, ReactNode } from "react";
 
 export function Panel({
   title,
@@ -49,7 +49,7 @@ export function Button({
   );
 }
 
-export function Field({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+export function Field({ label, ...props }: ComponentPropsWithRef<"input"> & { label: string }) {
   const { className, ...inputProps } = props;
   return (
     <label className="grid gap-1.5 text-sm font-medium text-slate-700">
