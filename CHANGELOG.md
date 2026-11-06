@@ -5,6 +5,8 @@ All notable changes to Modas Jayjo POS are documented here. The format follows [
 ## [Unreleased]
 
 ### Added
+- Edit authorized users and revoke existing sessions after credential or permission changes; relink Google when the authorized email changes (CR-034).
+- On-demand camera barcode scanner in sales and inventory, with live preview, camera cleanup and manual input fallback (CR-034).
 - Responsive login and role dashboards, plus sequential point-of-sale screens for garment selection, cash payment, and sale confirmation.
 - Manual product lookup by name or SKU, with exact-SKU entry support.
 
