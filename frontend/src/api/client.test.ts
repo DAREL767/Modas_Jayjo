@@ -4,6 +4,17 @@ import { requestJson } from "./client";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("requestJson", () => {
+  it("notifies auth of invalid credentials, but not ordinary permission errors", async () => {
+    const invalidated = vi.fn();
+    window.addEventListener("auth:invalidated", invalidated);
+    try {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ detail: "Denied" }), { status: 403 })).mockResolvedValueOnce(new Response("{}", { status: 401 })));
+      await expect(requestJson("/api/users/", {}, "token")).rejects.toMatchObject({ status: 403 });
+      expect(invalidated).not.toHaveBeenCalled();
+      await expect(requestJson("/api/auth/me", {}, "token")).rejects.toMatchObject({ status: 401 });
+      expect(invalidated).toHaveBeenCalledOnce();
+    } finally { window.removeEventListener("auth:invalidated", invalidated); }
+  });
   it("sends bearer auth to the configured API without cookies or redirects", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

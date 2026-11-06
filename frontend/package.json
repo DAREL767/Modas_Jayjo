@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
+    "@zxing/browser": "0.1.5",
+    "@zxing/library": "0.21.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

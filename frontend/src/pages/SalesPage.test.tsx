@@ -7,6 +7,7 @@ import { SalesPage } from "./SalesPage";
 
 const auth = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("../auth/AuthProvider", () => ({ useAuth: () => ({ accessToken: "test-token", user: { role: auth.role } }) }));
+vi.mock("../components/CameraScanner", () => ({ CameraScanButton: ({ onDetected }: { onDetected: (code: string) => void }) => <button type="button" onClick={() => onDetected("SKU-001")}>Escanear código</button> }));
 
 const product: Product = {
   id: "product-1", sku: "SKU-001", name: "Camisa azul", category: "Camisas",
@@ -118,6 +119,15 @@ describe("SalesPage sequential flow", () => {
     }
     expect(screen.getByRole("button", { name: "Agregar una unidad de Camisa azul" })).toBeDisabled();
     expect(screen.getByText("Disponibles: 0")).toBeInTheDocument();
+  });
+
+  it("uses a camera reading to find the variant before confirming the cart addition", async () => {
+    render(<SalesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Escanear código" }));
+    expect(screen.getByLabelText("Buscar por nombre o código")).toHaveValue("SKU-001");
+    expect(screen.getByText("Agrega prendas para iniciar la venta.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    expect(screen.getByRole("button", { name: "Proceder al cobro" })).toBeEnabled();
   });
 
   it("narrows suggestions by name and variant terms in any order without accents", async () => {

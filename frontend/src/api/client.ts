@@ -68,6 +68,9 @@ export async function requestJson<T>(
   }
 
   if (!response.ok) {
+    if (accessToken && (response.status === 401 || (response.status === 403 && safeErrorDetail(payload, response.status) === "Usuario inactivo"))) {
+      window.dispatchEvent(new CustomEvent("auth:invalidated", { detail: accessToken }));
+    }
     throw new ApiError(response.status, safeErrorDetail(payload, response.status));
   }
   if (response.status === 204 || !rawBody) return undefined as T;

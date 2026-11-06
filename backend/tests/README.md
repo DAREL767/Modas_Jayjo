@@ -33,6 +33,8 @@ El router `/api/users` requiere rol administrador y expone:
 - `GET /api/users/`: lista con `skip`, `limit` (máximo 100) y filtro opcional `is_active`.
 - `GET /api/users/{user_id}`: consulta por ObjectId.
 - `PATCH /api/users/{user_id}`: actualiza solo los campos enviados; permite cambiar contraseña.
+- Cambios de usuario, correo, contraseña, rol o estado rotan `session_version`; tokens anteriores se rechazan en cada ruta protegida. Los JWT nuevos incluyen identificador estable de usuario y versión de sesión. Las cuentas/tokens heredados sin versión siguen válidos hasta expirar o hasta su primer cambio crítico. Cambiar solo nombre o reenviar el mismo correo no revoca sesiones.
+- Cambiar correo elimina el vínculo Google anterior. La nueva vinculación comprueba correo y versión al persistir para impedir usar credenciales que cambiaron mientras se validaban.
 - `DELETE /api/users/{user_id}`: desactiva la cuenta (`is_active=false`) para preservar referencias históricas.
 
 La aplicación asegura índices únicos de MongoDB para username y email al iniciar. Si la colección ya contiene duplicados, la creación del índice detendrá el arranque; deben detectarse y resolverse antes de desplegar esta versión.

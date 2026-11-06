@@ -21,7 +21,7 @@ class FakeGoogleAuthService:
     async def authenticate(self, credential, *, username=None, password=None):
         if isinstance(self.outcome, Exception):
             raise self.outcome
-        return {"username": "sandra", "role": "vendor"}
+        return {"_id": "user-id", "username": "sandra", "role": "vendor", "session_version": "current-version"}
 
 
 def make_client(outcome):
@@ -44,6 +44,8 @@ def test_google_login_returns_application_jwt():
     assert decode_access_token(body["access_token"]) == {
         "sub": "sandra",
         "role": "vendor",
+        "uid": "user-id",
+        "sv": "current-version",
         "exp": decode_access_token(body["access_token"])["exp"],
     }
 

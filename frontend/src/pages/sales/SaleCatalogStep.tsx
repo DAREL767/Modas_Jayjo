@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { Product } from "../../api/types";
 import { Button, Field, formatCop } from "../../components/Panel";
+import { CameraScanButton } from "../../components/CameraScanner";
 
 type CartItem = { product: Product; quantity: number };
 
@@ -71,6 +72,7 @@ export function SaleCatalogStep({
             if (exactCode) add(exactCode);
           }} autoComplete="off" autoFocus />
           <p className="sale-search-hint">Selecciona la variante correcta para agregarla al carrito.</p>
+          <CameraScanButton onDetected={onSearchChange} />
           {normalizedSearch && (
             <div className="sale-search-results" role="list" aria-label="Prendas encontradas">
               {matches.length === 0 ? <p className="sale-no-results">No encontramos prendas disponibles con esa búsqueda.</p> : matches.map((product) => (

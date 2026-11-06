@@ -23,6 +23,16 @@ El workflow de GitHub ejecuta estos pasos en cada pull request que cambie `front
 
 ## Flujos operativos (CR-030)
 
+### Edición de cuentas y cámara (CR-034)
+
+Administración puede editar nombre, usuario, correo y contraseña desde Personal. Una contraseña vacía conserva la actual. Cambiar credenciales, rol o estado invalida las sesiones existentes en backend; un cambio solo de nombre no lo hace. El cliente vuelve al login ante una sesión invalidada y verifica la sesión al recuperar el foco y cada minuto. Cambiar credenciales propias cierra sesión inmediatamente. Cambiar el correo desvincula Google: para volver a entrar se requiere el nuevo correo autorizado y vincularlo con las credenciales locales.
+
+«Escanear código» abre una cámara superpuesta en ventas; muestra el SKU leído para confirmar la variante antes de agregar. Inventario permite escanear para buscar o completar el SKU de una prenda nueva. El lector se carga solo al abrir el escáner, prioriza la cámara trasera y admite cambiar de cámara. Al leer, cancelar, salir de la página o cambiar de pestaña libera la cámara. Se mantienen la escritura manual y el lector físico.
+
+La cámara requiere permiso y HTTPS (localhost funciona en el mismo dispositivo; una IP local por HTTP no). El video se procesa localmente con ZXing, no se graba ni se transmite. Lee códigos gráficos, no realiza OCR de números de serie impresos sin código. El contenido debe cumplir el formato de SKU del backend: 2–40 letras, números, puntos, guiones o guiones bajos.
+
+Prueba física móvil pendiente: abrir la versión de estos cambios por HTTPS, permitir cámara, probar etiquetas EAN/Code 128 con distintas luces, confirmar búsqueda y registro en inventario y búsqueda en ventas, cancelar/reabrir, cambiar cámara y comprobar el caso de permiso denegado. La comprobación automatizada en Edge usa una cámara virtual con Code 128; no sustituye esta prueba en teléfono.
+
 - Personal permite desactivar y reactivar cuentas desde administración usando la misma identidad e historial. Las listas de personal e inventario recorren todas las páginas de la API (100 registros por solicitud).
 - Ventas busca por nombre, categoría, talla y color combinando términos en cualquier orden y sin distinguir tildes o mayúsculas. Un SKU exacto tiene prioridad. Las sugerencias se reducen al agregar términos.
 - El código de barras o número de serie debe estar registrado en el campo SKU de la variante. Se admiten lectores que escriben el código y envían Enter; no se usa cámara. Enter agrega únicamente una coincidencia exacta de SKU y nunca supera el stock. Después de agregar, el campo queda vacío y enfocado para el siguiente escaneo.

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
 import { AuthProvider, useAuth } from "./AuthProvider";
@@ -20,6 +20,19 @@ function AuthHarness() {
 
 describe("AuthProvider", () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(cleanup);
+
+  it("returns to login when the current session is invalidated, ignoring stale tokens", async () => {
+    vi.mocked(api.googleLogin).mockResolvedValue({ access_token: "current-token", token_type: "bearer" });
+    vi.mocked(api.currentUser).mockResolvedValue(user);
+    render(<AuthProvider><AuthHarness /></AuthProvider>);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "google" })); });
+    await screen.findByText("authenticated");
+    await act(async () => { window.dispatchEvent(new CustomEvent("auth:invalidated", { detail: "old-token" })); });
+    expect(screen.getByText("authenticated")).toBeInTheDocument();
+    await act(async () => { window.dispatchEvent(new CustomEvent("auth:invalidated", { detail: "current-token" })); });
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+  });
 
   it("keeps the Google credential in memory while linking and exchanges it with the authorized account", async () => {
     vi.mocked(api.googleLogin)

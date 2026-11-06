@@ -19,5 +19,5 @@ class GoogleAuthUserRepository(Protocol):
     async def get_by_username(self, username: str) -> dict | None: ...
 
     async def link_google_subject(
-        self, user_id: str, subject: str
+        self, user_id: str, subject: str, *, expected_email: str, expected_session_version: str | None
     ) -> dict | None: ...

@@ -1,4 +1,5 @@
 from typing import Any
+from uuid import uuid4
 
 from app.modules.users.errors import (
     CannotModifySelfError,
@@ -21,6 +22,7 @@ class UserService:
     async def create_user(self, user_in: UserCreate) -> UserDocument:
         user_data = user_in.model_dump()
         user_data["password"] = get_password_hash(user_data["password"])
+        user_data["session_version"] = uuid4().hex
         return await self._users.create(user_data)
 
     async def get_user(self, user_id: str) -> UserDocument:
@@ -40,13 +42,19 @@ class UserService:
         changes: dict[str, Any] = user_in.model_dump(exclude_unset=True)
         if not changes:
             raise EmptyUserUpdateError
+        existing = await self.get_user(user_id)
+        credential_change = "password" in changes or any(
+            key in changes and changes[key] != existing.get(key)
+            for key in ("username", "email", "role", "is_active")
+        )
+        if credential_change:
+            changes["session_version"] = uuid4().hex
+        if "email" in changes and changes["email"] != existing.get("email"):
+            changes["google_sub"] = None
         if "password" in changes:
             changes["password"] = get_password_hash(changes["password"])
 
         if {"username", "email", "role", "is_active"}.intersection(changes):
-            existing = await self._users.get_by_id(user_id)
-            if existing is None:
-                raise UserNotFoundError
             if {"username", "email"}.intersection(changes):
                 username = changes.get("username", existing["username"])
                 email = changes.get("email", existing["email"])

@@ -3,6 +3,7 @@ import { api } from "../api/endpoints";
 import type { Product, ProductCreate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
+import { CameraScanButton } from "../components/CameraScanner";
 
 const emptyProduct: ProductCreate = {
   sku: "",
@@ -46,7 +47,8 @@ export function InventoryPage() {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const visibleProducts = products.filter((product) =>
+  const exactProduct = products.find((product) => product.sku.toUpperCase() === search.trim().toUpperCase());
+  const visibleProducts = exactProduct ? [exactProduct] : products.filter((product) =>
     `${product.name} ${product.sku} ${product.category} ${product.color} ${product.size}`
       .toLocaleLowerCase("es")
       .includes(search.toLocaleLowerCase("es")),
@@ -139,6 +141,7 @@ export function InventoryPage() {
             Buscar por prenda, SKU, categoría o variante
             <input className="mt-1.5 min-h-11 w-full rounded-xl border border-slate-200 px-3.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ej. camiseta, CAM-001, azul" />
           </label>
+          <CameraScanButton onDetected={setSearch} label="Escanear para buscar" />
           {error !== null && <ErrorNotice error={error} />}
           {notice && <Notice tone="success">{notice}</Notice>}
           {loading ? <p className="py-8 text-center text-sm text-slate-500">Cargando inventario…</p> : visibleProducts.length === 0 ? <p className="rounded-2xl bg-slate-50 py-10 text-center text-sm text-slate-500">No hay prendas que coincidan con la búsqueda.</p> : (
@@ -168,6 +171,7 @@ export function InventoryPage() {
       <Panel title="Registrar nueva prenda" description="Cada registro representa una variante de talla y color. El stock inicial queda registrado como movimiento.">
           <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={createProduct}>
             <Field label="SKU" value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value.toUpperCase() })} required />
+            <div className="flex items-end"><CameraScanButton disabled={working} label="Escanear SKU de nueva prenda" onDetected={(sku) => setDraft((current) => ({ ...current, sku }))} /></div>
             <Field label="Nombre" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
             <Field label="Categoría" value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} required />
             <Field label="Talla" value={draft.size} onChange={(event) => setDraft({ ...draft, size: event.target.value })} required />

@@ -37,6 +37,9 @@ class FakeUserRepository:
     async def get_by_id(self, user_id: str) -> dict | None:
         return next((user for user in self.users if user["_id"] == user_id), None)
 
+    async def get_by_username(self, username: str) -> dict | None:
+        return next((user for user in self.users if user["username"] == username), None)
+
     async def list_all(self, *, skip=0, limit=50, is_active=None) -> list[dict]:
         users = self.users
         if is_active is not None:
@@ -163,3 +166,60 @@ async def test_service_preserves_access_to_the_last_admin():
         await service.update_user(
             admin["_id"], UserUpdate(role=UserRole.VENDOR), actor_user_id=admin["_id"]
         )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("changes", [
+    {"password": "changed-password"}, {"email": "new@example.com"},
+    {"username": "new-user"}, {"role": "admin"}, {"is_active": False},
+])
+async def test_credential_changes_revoke_existing_tokens(monkeypatch, changes):
+    from fastapi import HTTPException
+    from app.api import dependencies
+    from app.modules.auth.router import _create_token_response
+
+    repository = FakeUserRepository()
+    service = UserService(repository)
+    user = await service.create_user(make_user())
+    user["google_sub"] = "old-google-subject"
+    monkeypatch.setattr(dependencies, "UserRepository", lambda: repository)
+    token = _create_token_response(user).access_token
+    assert await dependencies.get_current_user(token) is user
+    await service.update_user(user["_id"], UserUpdate(**changes), actor_user_id="admin-id")
+    with pytest.raises(HTTPException) as caught:
+        await dependencies.get_current_user(token)
+    assert caught.value.status_code == 401
+    if "email" in changes:
+        assert user["google_sub"] is None
+    if user["is_active"]:
+        assert await dependencies.get_current_user(_create_token_response(user).access_token) is user
+
+
+@pytest.mark.anyio
+async def test_noncritical_and_unchanged_fields_preserve_session(monkeypatch):
+    from app.api import dependencies
+    from app.modules.auth.router import _create_token_response
+    repository = FakeUserRepository()
+    service = UserService(repository)
+    user = await service.create_user(make_user())
+    monkeypatch.setattr(dependencies, "UserRepository", lambda: repository)
+    token = _create_token_response(user).access_token
+    await service.update_user(user["_id"], UserUpdate(full_name="Nuevo nombre", email=user["email"]), actor_user_id="admin-id")
+    assert await dependencies.get_current_user(token) is user
+
+
+@pytest.mark.anyio
+async def test_legacy_sessions_expire_on_first_critical_change(monkeypatch):
+    from fastapi import HTTPException
+    from app.api import dependencies
+    from app.security.tokens import create_access_token
+    repository = FakeUserRepository()
+    service = UserService(repository)
+    user = await service.create_user(make_user())
+    user.pop("session_version")
+    monkeypatch.setattr(dependencies, "UserRepository", lambda: repository)
+    token = create_access_token({"sub": user["username"]})
+    assert await dependencies.get_current_user(token) is user
+    await service.update_user(user["_id"], UserUpdate(email="new@example.com"), actor_user_id="admin-id")
+    with pytest.raises(HTTPException):
+        await dependencies.get_current_user(token)
