@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -9,6 +10,8 @@ from app.modules.users.errors import DuplicateUserError
 from app.core.config import settings
 from app.infrastructure.mongodb import client as mongo_client
 from app.infrastructure.mongodb.indexes.user_indexes import ensure_user_indexes
+from app.infrastructure.mongodb.collections import get_inventory_collection, get_inventory_movements_collection
+from app.infrastructure.mongodb.repositories.inventory_repository import InventoryRepository
 from app.infrastructure.mongodb.maintenance.user_maintenance_repository import (
     UserMaintenanceRepository,
 )
@@ -140,6 +143,29 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         assert legacy_vendor["role"] == "vendor"
         assert legacy_admin["role"] == "vendor"
         assert legacy_admin["is_active"] is False
+
+        inventory = InventoryRepository()
+        product = await inventory.create({
+            "sku": "TEST-1", "name": "Prenda de prueba", "is_active": False,
+            "stock_quantity": 3, "created_at": datetime.now(UTC),
+            "photo": "fixture", "has_photo": True,
+        }, actor_id="test-admin")
+        product_id = str(product["_id"])
+        assert (await inventory.get_by_id(product_id))["photo"] == "fixture"
+        listed = await inventory.list_products(active_only=False)
+        assert len(listed) == 1
+        assert listed[0]["has_photo"] and "photo" not in listed[0]
+
+        assert await inventory.delete(product_id, actor_id="test-admin")
+        assert not await inventory.delete(product_id, actor_id="test-admin")
+        deleted = await get_inventory_collection().find_one({"_id": product["_id"]})
+        assert deleted["stock_quantity"] == -1 and "photo" not in deleted
+        assert await inventory.list_products(active_only=False) == []
+        assert await inventory.get_by_id(product_id) is None
+        assert await inventory.update(product_id, {"is_active": True}) is None
+        assert await inventory.adjust_stock(product_id, 2, "Ajuste de prueba", "test-admin") is None
+        movements = get_inventory_movements_collection()
+        assert await movements.count_documents({"product_id": product["_id"], "reason": "product_deleted", "delta": -3}) == 1
     except Exception as exc:
         operation_error = exc
         raise

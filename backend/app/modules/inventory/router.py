@@ -125,6 +125,33 @@ async def create_product(
         _raise_http_error(error)
 
 
+@router.get("/{product_id}/photo")
+async def get_product_photo(
+    product_id: str,
+    service: InventoryServiceDependency,
+    current_user: dict = Depends(require_staff),
+) -> dict[str, str | None]:
+    try:
+        product = await service.get_product(
+            product_id, include_inactive=current_user.get("role") == UserRole.ADMIN.value
+        )
+        return {"photo": product.get("photo")}
+    except (InvalidProductIdError, ProductNotFoundError) as error:
+        _raise_http_error(error)
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(
+    product_id: str,
+    service: InventoryServiceDependency,
+    current_user: dict = Depends(require_admin),
+) -> None:
+    try:
+        await service.delete_product(product_id, actor_id=str(current_user["_id"]))
+    except (InvalidProductIdError, ProductNotFoundError) as error:
+        _raise_http_error(error)
+
+
 @router.patch(
     "/{product_id}",
     response_model=ProductResponse,

@@ -1,6 +1,23 @@
+from base64 import b64decode
+from binascii import Error
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def validate_photo(value: str) -> str:
+    prefix = "data:image/jpeg;base64,"
+    try:
+        data = b64decode(value[len(prefix):], validate=True) if value.startswith(prefix) else b""
+    except (Error, ValueError):
+        data = b""
+    if not data.startswith(b"\xff\xd8\xff") or not data.endswith(b"\xff\xd9"):
+        raise ValueError("La foto debe ser una imagen JPEG válida")
+    return value
+
+
+ProductPhoto = Annotated[str, Field(max_length=131_072), AfterValidator(validate_photo)]
 
 
 class ProductCreate(BaseModel):
@@ -13,6 +30,7 @@ class ProductCreate(BaseModel):
     unit_cost_cop: int | None = Field(default=None, ge=0, le=2_000_000_000)
     stock_quantity: int = Field(default=0, ge=0, le=1_000_000)
     low_stock_threshold: int = Field(default=0, ge=0, le=1_000_000)
+    photo: ProductPhoto | None = None
 
     @field_validator("sku", "name", "category", "size", "color", mode="before")
     @classmethod
@@ -35,6 +53,7 @@ class ProductUpdate(BaseModel):
     unit_cost_cop: int | None = Field(default=None, ge=0, le=2_000_000_000)
     low_stock_threshold: int | None = Field(default=None, ge=0, le=1_000_000)
     is_active: bool | None = None
+    photo: ProductPhoto | None = None
 
     @field_validator("sku", "name", "category", "size", "color", mode="before")
     @classmethod
@@ -49,7 +68,7 @@ class ProductUpdate(BaseModel):
     @model_validator(mode="after")
     def require_changes(self):
         changes = self.model_dump(exclude_unset=True)
-        if not changes or any(value is None for value in changes.values()):
+        if not changes or any(value is None for key, value in changes.items() if key not in {"photo", "unit_cost_cop"}):
             raise ValueError("Envía cambios no nulos para actualizar la prenda")
         return self
 
@@ -85,6 +104,7 @@ class ProductResponse(BaseModel):
     stock_quantity: int
     low_stock_threshold: int
     is_active: bool = True
+    has_photo: bool = False
     created_at: datetime
     updated_at: datetime
 

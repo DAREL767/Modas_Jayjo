@@ -1,13 +1,27 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../../api/endpoints";
 import type { Product } from "../../api/types";
 import { Button, Field, formatCop } from "../../components/Panel";
 import { CameraScanButton } from "../../components/CameraScanner";
 import type { CartItem, saleAmounts } from "./amounts";
 
+function CartPhoto({ productId, accessToken }: { productId: string; accessToken: string }) {
+  const [photo, setPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void api.productPhoto(accessToken, productId, controller.signal)
+      .then(({ photo }) => { if (!controller.signal.aborted) setPhoto(photo); })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [accessToken, productId]);
+  return photo ? <img className="sale-garment-photo" src={photo} alt="" /> : <span className="sale-garment-icon" aria-hidden="true">👕</span>;
+}
+
 export function SaleCatalogStep({
-  products, cart, search, onSearchChange, onAdd, onRemove, onContinue, onDiscount, amounts,
+  products, cart, search, onSearchChange, onAdd, onRemove, onContinue, onDiscount, amounts, accessToken,
 }: {
   products: Product[];
+  accessToken: string | null;
   cart: CartItem[];
   search: string;
   onSearchChange: (value: string) => void;
@@ -39,31 +53,6 @@ export function SaleCatalogStep({
   return (
     <section className="sale-card">
       <div className="sale-workspace">
-        <div className="sale-cart-column">
-          <h2 className="sale-section-title">Carrito de compras <span>({cart.length})</span></h2>
-          <div className="sale-cart-list" aria-live="polite">
-            {cart.length === 0 ? (
-              <p className="sale-empty-cart">Agrega prendas para iniciar la venta.</p>
-            ) : cart.map(({ product, quantity, unitDiscountCop }) => (
-              <article className="sale-cart-item" key={product.id}>
-                <div className="sale-garment-icon" aria-hidden="true">👕</div>
-                <div className="sale-cart-description">
-                  <strong>{product.name}</strong>
-                  <span>{product.size} · {product.color} · {formatCop(product.unit_price_cop)}</span>
-                  <button type="button" className="sale-discount-button" onClick={() => onDiscount(product)}>Descuento de {product.name}: {formatCop(unitDiscountCop)} / unidad</button>
-                  <span>Total: {formatCop((product.unit_price_cop - unitDiscountCop) * quantity)}</span>
-                </div>
-                <div className="sale-quantity-control" aria-label={"Cantidad de " + product.name}>
-                  <button type="button" aria-label={"Quitar una unidad de " + product.name} onClick={() => onRemove(product)}>−</button>
-                  <span>{quantity}</span>
-                  <button type="button" aria-label={"Agregar una unidad de " + product.name} disabled={quantity >= product.stock_quantity} onClick={() => onAdd(product)}>+</button>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div className="sale-total-chip">TOTAL: {formatCop(amounts.total)}</div>
-        </div>
-
         <div className="sale-search-column">
           <Field ref={searchInput} label="Buscar por nombre o código" placeholder="Nombre, variante o código / número de serie (SKU)" value={search} onChange={(event) => onSearchChange(event.target.value)} onKeyDown={(event) => {
             if (event.key !== "Enter") return;
@@ -72,11 +61,6 @@ export function SaleCatalogStep({
           }} autoComplete="off" autoFocus />
           <p className="sale-search-hint">Selecciona la variante correcta para agregarla al carrito.</p>
           <CameraScanButton onDetected={onSearchChange} />
-          <div className="sale-discount-summary">
-            <h3 className="sale-section-title">Resumen de la venta</h3>
-            <dl><div><dt>Subtotal</dt><dd>{formatCop(amounts.subtotal)}</dd></div><div><dt>Descuentos</dt><dd>− {formatCop(amounts.discount)}</dd></div><div><dt>Total a pagar</dt><dd>{formatCop(amounts.total)}</dd></div></dl>
-            <p>El descuento de cada prenda empieza en $0. Puedes cambiarlo desde el carrito. Si todas siguen en $0, confirmarás el descuento global antes de cobrar.</p>
-          </div>
           {normalizedSearch && (
             <div className="sale-search-results" role="list" aria-label="Prendas encontradas">
               {matches.length === 0 ? <p className="sale-no-results">No encontramos prendas disponibles con esa búsqueda.</p> : matches.map((product) => (
@@ -95,9 +79,39 @@ export function SaleCatalogStep({
             </div>
           )}
         </div>
-      </div>
-      <div className="sale-card-footer">
-        <Button className="sale-continue-button" disabled={cart.length === 0} onClick={onContinue}>Proceder al cobro</Button>
+        <div className="sale-cart-column">
+          <h2 className="sale-section-title">Carrito de compras <span>({cart.length})</span></h2>
+          <div className="sale-cart-list" aria-live="polite">
+            {cart.length === 0 ? (
+              <p className="sale-empty-cart">Agrega prendas para iniciar la venta.</p>
+            ) : cart.map(({ product, quantity, unitDiscountCop }) => (
+              <article className="sale-cart-item" key={product.id}>
+                {product.has_photo && accessToken
+                  ? <CartPhoto productId={product.id} accessToken={accessToken} />
+                  : <span className="sale-garment-icon" aria-hidden="true">👕</span>}
+                <div className="sale-cart-description">
+                  <strong>{product.name}</strong>
+                  <span>{product.size} · {product.color} · {formatCop(product.unit_price_cop)}</span>
+                  <button type="button" className="sale-discount-button" onClick={() => onDiscount(product)}>Descuento de {product.name}: {formatCop(unitDiscountCop)} / unidad</button>
+                  <span>Total: {formatCop((product.unit_price_cop - unitDiscountCop) * quantity)}</span>
+                </div>
+                <div className="sale-quantity-control" aria-label={"Cantidad de " + product.name}>
+                  <button type="button" aria-label={"Quitar una unidad de " + product.name} onClick={() => onRemove(product)}>−</button>
+                  <span>{quantity}</span>
+                  <button type="button" aria-label={"Agregar una unidad de " + product.name} disabled={quantity >= product.stock_quantity} onClick={() => onAdd(product)}>+</button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="sale-discount-summary">
+            <h3 className="sale-section-title">Resumen de la venta</h3>
+            <dl><div><dt>Subtotal</dt><dd>{formatCop(amounts.subtotal)}</dd></div><div><dt>Descuentos</dt><dd>− {formatCop(amounts.discount)}</dd></div><div><dt>Total a pagar</dt><dd>{formatCop(amounts.total)}</dd></div></dl>
+          </div>
+          <div className="sale-card-footer">
+            <Button className="sale-continue-button" disabled={cart.length === 0} onClick={onContinue}>Proceder al cobro</Button>
+          </div>
+        </div>
+
       </div>
     </section>
   );

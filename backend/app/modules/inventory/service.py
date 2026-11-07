@@ -16,6 +16,7 @@ class InventoryService:
 
     async def create_product(self, data: ProductCreate, *, actor_id: str) -> dict:
         product = data.model_dump()
+        product["has_photo"] = product.get("photo") is not None
         now = datetime.now(UTC)
         product.update(is_active=True, created_at=now, updated_at=now)
         return await self._products.create(product, actor_id=actor_id)
@@ -41,6 +42,8 @@ class InventoryService:
         changes = data.model_dump(exclude_unset=True)
         if not changes:
             raise EmptyProductUpdateError
+        if "photo" in changes:
+            changes["has_photo"] = changes["photo"] is not None
         changes["updated_at"] = datetime.now(UTC)
         try:
             product = await self._products.update(product_id, changes)
@@ -49,6 +52,10 @@ class InventoryService:
         if product is None:
             raise ProductNotFoundError
         return product
+
+    async def delete_product(self, product_id: str, *, actor_id: str) -> None:
+        if not await self._products.delete(product_id, actor_id=actor_id):
+            raise ProductNotFoundError
 
     async def adjust_stock(
         self, product_id: str, delta: int, reason: str, actor_id: str

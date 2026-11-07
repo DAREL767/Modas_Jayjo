@@ -31,6 +31,10 @@ export const api = {
   currentUser: (token: string) => requestJson<User>("/api/auth/me", {}, token),
   inventory: (token: string, activeOnly = true) =>
     listAll<Product>(`/api/inventory/?active_only=${activeOnly}`, token),
+  productPhoto: (token: string, id: string, signal?: AbortSignal) =>
+    requestJson<{ photo: string | null }>(`/api/inventory/${encodeURIComponent(id)}/photo`, { signal }, token),
+  deleteProduct: (token: string, id: string) =>
+    requestJson<void>(`/api/inventory/${encodeURIComponent(id)}`, { method: "DELETE" }, token),
   createProduct: (token: string, product: ProductCreate) =>
     requestJson<Product>(
       "/api/inventory/",
