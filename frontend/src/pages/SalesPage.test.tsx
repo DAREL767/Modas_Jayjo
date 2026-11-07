@@ -36,12 +36,7 @@ describe("SalesPage sequential flow", () => {
     const onReturnToDashboard = vi.fn();
     vi.spyOn(api, "createSale").mockResolvedValue(sale);
     vi.stubGlobal("crypto", { randomUUID: () => "test-idempotency-key" });
-    const successTimeout = vi.fn();
-    const nativeSetTimeout = window.setTimeout.bind(window);
-    vi.spyOn(window, "setTimeout").mockImplementation(((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
-      if (delay === 2200 && typeof handler === "function") successTimeout.mockImplementation(handler as () => void);
-      return nativeSetTimeout(handler, delay, ...args);
-    }) as typeof window.setTimeout);
+    const timeout = vi.spyOn(window, "setTimeout");
     render(<SalesPage onReturnToDashboard={onReturnToDashboard} />);
 
     fireEvent.change(await screen.findByLabelText("Buscar por nombre o código"), { target: { value: "SKU-001" } });
@@ -50,9 +45,17 @@ describe("SalesPage sequential flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Procesar Pago" })).toBeInTheDocument());
 
+    for (const amount of ["2.000", "5.000", "10.000"]) {
+      fireEvent.click(screen.getByRole("button", { name: new RegExp("^\\+.*" + amount.replace(".", "\\.") + "$") }));
+    }
+    expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(17000);
+    fireEvent.click(screen.getByRole("button", { name: /Pago exacto/ }));
     fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
     expect(await screen.findByRole("dialog", { name: "¡Venta registrada!" })).toBeInTheDocument();
     expect(api.createSale).toHaveBeenCalledOnce();
+    expect(screen.getByText("Comprobante de venta · Modas Jayjo")).toBeInTheDocument();
+    expect(timeout).not.toHaveBeenCalledWith(expect.any(Function), 2200);
+    expect(onReturnToDashboard).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Finalizar y volver al menú" }));
     expect(onReturnToDashboard).toHaveBeenCalledOnce();
@@ -105,6 +108,7 @@ describe("SalesPage sequential flow", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Pago exacto/ }));
     fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Abrir caja" }));
     await screen.findByLabelText("Buscar por nombre o código");
@@ -141,6 +145,7 @@ describe("SalesPage sequential flow", () => {
     expect(screen.getByLabelText("Descuento global (COP)")).toHaveValue(0);
     fireEvent.change(screen.getByLabelText("Descuento global (COP)"), { target: { value: "5000" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Pago exacto/ }));
     expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(80000);
     fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
     await waitFor(() => expect(create).toHaveBeenCalledWith("test-token", { items: [{ product_id: product.id, quantity: 1 }], cash_received_cop: 80000, global_discount_cop: 5000 }, expect.any(String)));
@@ -157,6 +162,7 @@ describe("SalesPage sequential flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agregar una unidad de Camisa azul" }));
     fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
     expect(screen.queryByLabelText("Descuento global (COP)")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Pago exacto/ }));
     expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(160000);
     fireEvent.click(screen.getByRole("button", { name: /Confirmar venta/ }));
     await waitFor(() => expect(create).toHaveBeenCalledWith("test-token", { items: [{ product_id: product.id, quantity: 2, unit_discount_cop: 5000 }], cash_received_cop: 160000 }, expect.any(String)));

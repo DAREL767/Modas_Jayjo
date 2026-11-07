@@ -17,6 +17,33 @@ const emptyProduct: ProductCreate = {
   low_stock_threshold: 0,
 };
 
+async function readProductPhoto(form: HTMLFormElement) {
+  const file = new FormData(form).get("product-photo");
+  if (!(file instanceof File) || file.size === 0) return undefined;
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const scale = Math.min(1, 400 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("No se pudo preparar la foto.");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.8, 0.6, 0.4]) {
+      const photo = canvas.toDataURL("image/jpeg", quality);
+      if (photo.startsWith("data:image/jpeg;base64,") && photo.length <= 131_072) return photo;
+    }
+    throw new Error("La foto supera el tamaño permitido.");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function InventoryPage() {
   const { accessToken, user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -62,7 +89,8 @@ export function InventoryPage() {
     setError(null);
     setNotice("");
     try {
-      await api.createProduct(accessToken, draft);
+      const photo = await readProductPhoto(event.currentTarget);
+      await api.createProduct(accessToken, { ...draft, photo });
       setDraft(emptyProduct);
       setRegistering(false);
       setSearch("");
@@ -81,6 +109,7 @@ export function InventoryPage() {
     setWorking(true);
     setError(null);
     try {
+      const photo = await readProductPhoto(event.currentTarget);
       await api.updateProduct(accessToken, editing.id, {
         sku: editing.sku,
         name: editing.name,
@@ -91,6 +120,7 @@ export function InventoryPage() {
         unit_cost_cop: editing.unit_cost_cop,
         low_stock_threshold: editing.low_stock_threshold,
         is_active: editing.is_active,
+        photo,
       });
       setEditing(null);
       setNotice("Los cambios del producto se guardaron.");
@@ -136,6 +166,22 @@ export function InventoryPage() {
     }
   };
 
+  const deleteProduct = async (product: Product) => {
+    if (!accessToken || !window.confirm(`¿Eliminar ${product.name} (${product.sku}) del catálogo? Se retirarán ${product.stock_quantity} unidades y se conservará el historial de ventas.`)) return;
+    setWorking(true);
+    setError(null);
+    setNotice("");
+    try {
+      await api.deleteProduct(accessToken, product.id);
+      setProducts((current) => current.filter((item) => item.id !== product.id));
+      setNotice("La prenda se eliminó del catálogo.");
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setWorking(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {!registering && <Panel title="Inventario de prendas" description="Cada registro representa una variante de talla y color." action={<Button onClick={() => { setError(null); setNotice(""); setRegistering(true); }}>Agregar prenda</Button>}>
@@ -161,7 +207,14 @@ export function InventoryPage() {
                       <td className="px-4 py-3.5 font-medium text-slate-800">{formatCop(product.unit_price_cop)}</td>
                       {isAdmin && <td className="px-4 py-3.5 text-slate-600">{product.unit_cost_cop == null ? "—" : formatCop(product.unit_cost_cop)}</td>}
                       <td className="px-4 py-3.5"><span className={`font-semibold ${product.stock_quantity <= product.low_stock_threshold ? "text-amber-700" : "text-slate-800"}`}>{product.stock_quantity}</span><span className="ml-2 text-xs text-slate-400">mín. {product.low_stock_threshold}</span></td>
-                      {isAdmin && <td className="px-4 py-3.5"><div className="flex flex-wrap gap-2"><Button className="min-h-9 px-3 text-xs" variant="secondary" onClick={() => setEditing({ ...product })}>Editar</Button><Button className="min-h-9 px-3 text-xs" variant="secondary" onClick={() => setAdjusting(product)}>Ajustar</Button>{product.is_active && <Button className="min-h-9 px-3 text-xs" variant="danger" disabled={working} onClick={() => void deactivate(product)}>Desactivar</Button>}{isAdmin && !product.is_active && <Button className="min-h-9 px-3 text-xs" variant="secondary" onClick={() => void api.updateProduct(accessToken!, product.id, { is_active: true }).then(reload).catch(setError)}>Reactivar</Button>}</div></td>}
+                      {isAdmin && <td className="px-4 py-3.5"><div className="flex flex-wrap gap-2">
+                        <Button className="min-h-9 px-3 text-xs" variant="secondary" disabled={working} onClick={() => setEditing({ ...product })}>Editar</Button>
+                        <Button className="min-h-9 px-3 text-xs" variant="secondary" disabled={working || !product.is_active} onClick={() => setAdjusting(product)}>Ajustar</Button>
+                        {product.is_active
+                          ? <Button className="min-h-9 px-3 text-xs" variant="secondary" disabled={working} onClick={() => void deactivate(product)}>Desactivar</Button>
+                          : <Button className="min-h-9 px-3 text-xs" variant="secondary" disabled={working} onClick={() => void api.updateProduct(accessToken!, product.id, { is_active: true }).then(reload).catch(setError)}>Reactivar</Button>}
+                        <Button className="min-h-9 px-3 text-xs" variant="danger" disabled={working} onClick={() => void deleteProduct(product)}>Eliminar</Button>
+                      </div></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -184,6 +237,7 @@ export function InventoryPage() {
             {isAdmin && <Field label="Costo (COP)" type="number" min="0" value={draft.unit_cost_cop ?? ""} onChange={(event) => setDraft({ ...draft, unit_cost_cop: event.target.value === "" ? null : Number(event.target.value) })} />}
             <Field label="Stock inicial" type="number" min="0" value={draft.stock_quantity} onChange={(event) => setDraft({ ...draft, stock_quantity: Number(event.target.value) })} required />
             <Field label="Alerta de stock bajo" type="number" min="0" value={draft.low_stock_threshold} onChange={(event) => setDraft({ ...draft, low_stock_threshold: Number(event.target.value) })} required />
+            <Field label="Foto para el carrito (opcional)" name="product-photo" type="file" accept="image/*" capture="environment" />
             <div className="flex items-end"><Button type="submit" disabled={working}>{working ? "Guardando…" : "Crear prenda"}</Button></div>
           </form>
       </Panel>}
@@ -192,6 +246,7 @@ export function InventoryPage() {
         <div className="fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-product-title">
           <form className="my-auto w-full max-w-2xl space-y-5 rounded-3xl bg-white p-6 shadow-2xl sm:p-8" onSubmit={saveProduct}>
             <div><h2 id="edit-product-title" className="text-xl font-bold">Editar {editing.sku}</h2><p className="mt-1 text-sm text-slate-500">La venta conserva su propia copia del precio y la variante.</p></div>
+            {error !== null && <ErrorNotice error={error} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="SKU" value={editing.sku} onChange={(event) => setEditing({ ...editing, sku: event.target.value.toUpperCase() })} required />
               <Field label="Nombre" value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} required />
@@ -201,6 +256,7 @@ export function InventoryPage() {
               <Field label="Precio (COP)" type="number" min="1" value={editing.unit_price_cop} onChange={(event) => setEditing({ ...editing, unit_price_cop: Number(event.target.value) })} required />
               <Field label="Costo (COP)" type="number" min="0" value={editing.unit_cost_cop ?? ""} onChange={(event) => setEditing({ ...editing, unit_cost_cop: event.target.value === "" ? null : Number(event.target.value) })} />
               <Field label="Alerta stock bajo" type="number" min="0" value={editing.low_stock_threshold} onChange={(event) => setEditing({ ...editing, low_stock_threshold: Number(event.target.value) })} required />
+              <Field label={editing.has_photo ? "Reemplazar foto para el carrito" : "Foto para el carrito (opcional)"} name="product-photo" type="file" accept="image/*" capture="environment" />
             </div>
             <div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit" disabled={working}>Guardar</Button></div>
           </form>

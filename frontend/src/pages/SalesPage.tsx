@@ -72,12 +72,6 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
     onReturnToDashboard();
   }, [onReturnToDashboard]);
 
-  useEffect(() => {
-    if (!sale) return;
-    const timeout = window.setTimeout(returnToDashboard, 2200);
-    return () => window.clearTimeout(timeout);
-  }, [sale, returnToDashboard]);
-
   const cart: CartItem[] = products.flatMap((product) => {
     const quantity = quantities[product.id] ?? 0;
     return quantity > 0 ? [{ product, quantity, unitDiscountCop: discounts[product.id] ?? 0 }] : [];
@@ -111,12 +105,12 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
       setConfirmGlobal(true);
       return;
     }
-    setCashReceived(total);
+    setCashReceived(0);
     setStep("payment");
   };
 
   const checkout = async () => {
-    if (!accessToken || cart.length === 0 || cashReceived < total) return;
+    if (!accessToken || cart.length === 0 || cashReceived < total || !Number.isInteger(cashReceived) || cashReceived > 2_000_000_000) return;
     setWorking(true);
     setError(null);
     idempotencyKey.current ??= crypto.randomUUID();
@@ -171,6 +165,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
               {error !== null && <div className="sales-flow-notice"><ErrorNotice error={error} /></div>}
               <SaleCatalogStep
                 products={products}
+                accessToken={accessToken}
                 cart={cart}
                 search={search}
                 onSearchChange={setSearch}
@@ -215,7 +210,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
           event.preventDefault();
           if (!Number.isInteger(discountDraft) || discountDraft < 0 || discountDraft > subtotal) return;
           setGlobalDiscount(discountDraft); idempotencyKey.current = null;
-          setCashReceived(subtotal - discountDraft); setConfirmGlobal(false); setStep("payment");
+          setCashReceived(0); setConfirmGlobal(false); setStep("payment");
         }}>
           <h2 id="global-discount-title" className="text-xl font-bold">Confirmar descuento de la venta</h2>
           <p className="text-sm text-slate-600">No hay descuentos por prenda. Aplica uno global o deja $0 para continuar sin descuento.</p>

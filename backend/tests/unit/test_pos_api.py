@@ -82,6 +82,22 @@ def test_vendor_cannot_edit_product():
     )
 
     assert response.status_code == 403
+    assert TestClient(app).delete("/api/inventory/product-id").status_code == 403
+
+
+def test_inventory_rejects_non_jpeg_photo():
+    app = FastAPI()
+    app.include_router(inventory_router)
+    service = InventoryApiService()
+    app.dependency_overrides[get_current_user] = lambda: {"_id": "vendor-id", "role": "vendor"}
+    app.dependency_overrides[get_inventory_service] = lambda: service
+
+    response = TestClient(app).post(
+        "/api/inventory/", json={**_product_payload(), "photo": "data:image/svg+xml;base64,PHN2Zz4="}
+    )
+
+    assert response.status_code == 422
+    assert service.created is None
 
 
 def test_cash_history_is_admin_only_and_uses_colombia_day_boundaries():

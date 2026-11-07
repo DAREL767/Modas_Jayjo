@@ -6,20 +6,23 @@
 .sales-cash-status.is-open { color: #438f25; }
 .sales-cash-status.is-closed { color: #b45309; }
 .sale-card { border: 1px solid #dedede; border-radius: 2rem; background: #fff; padding: clamp(1.1rem, 3vw, 2.4rem); box-shadow: 0 20px 48px -36px #1f2937; }
-.sale-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, .9fr); gap: 2rem; }
+.sale-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, .9fr); grid-template-areas: "cart search"; gap: 2rem; }
+.sale-cart-column { grid-area: cart; }
 .sale-section-title { margin: 0 0 .8rem; font-size: 1.15rem; font-weight: 700; color: #171717; }
 .sale-cart-list { min-height: 11rem; max-height: 22rem; overflow: auto; border: 1px solid #ddd; border-radius: 1.5rem; background: #f4f6fb; padding: .8rem; }
 .sale-empty-cart, .sale-no-results { margin: 1.5rem 0; text-align: center; color: #64748b; }
 .sale-cart-item { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: .6rem; padding: .5rem 0; }
-.sale-garment-icon { font-size: 1.25rem; }
+.sale-garment-icon, .sale-garment-photo { width: clamp(2rem, 6vw, 3rem); height: clamp(2rem, 6vw, 3rem); border-radius: .6rem; }
+.sale-garment-icon { display: grid; place-items: center; font-size: 1.25rem; }
+.sale-garment-photo { object-fit: cover; }
 .sale-cart-description, .sale-product-result > div:first-child { display: grid; gap: .15rem; min-width: 0; }
 .sale-cart-description strong, .sale-product-result strong { color: #1e293b; }
 .sale-cart-description span, .sale-product-result span { color: #64748b; font-size: .8rem; }
 .sale-quantity-control { display: flex; align-items: center; gap: .45rem; }
 .sale-quantity-control button { width: 2rem; height: 2rem; border: 1px solid #d1d5db; border-radius: 50%; background: #fff; font-weight: 700; }
 .sale-quantity-control button:disabled { opacity: .45; }
-.sale-total-chip { display: table; margin: .6rem 0 0 auto; border-radius: .4rem; background: #c7e3ff; padding: .3rem .65rem; font-weight: 750; }
-.sale-search-column { display: grid; align-content: start; gap: .65rem; }
+.sale-cart-column .sale-discount-summary { margin-top: .75rem; }
+.sale-search-column { grid-area: search; display: grid; align-content: start; gap: .65rem; }
 .sale-discount-button { justify-self: start; color: #275d89; text-align: left; font-size: .78rem; text-decoration: underline; text-underline-offset: 3px; padding: .35rem 0; }
 .sale-discount-summary { border: 1px solid #dbe2ea; border-radius: 1rem; background: #f7faff; padding: 1rem; }
 .sale-discount-summary dl > div, dl.sale-discount-summary > div { display: flex; justify-content: space-between; gap: 1rem; margin: .35rem 0; }
@@ -37,7 +40,8 @@
 .sale-payment-total { display: flex; justify-content: center; gap: 1.5rem; border-bottom: 2px solid #222; padding: 0 0 .5rem; color: #555; font-size: clamp(1.3rem, 3vw, 1.75rem); font-weight: 750; }
 .sale-payment-content { display: grid; gap: 1.2rem; max-width: 42rem; margin: 1rem auto; }
 .sale-quick-cash p { margin: 0 0 .5rem; }
-.sale-quick-cash > div { display: flex; flex-wrap: wrap; gap: .6rem; }
+.sale-quick-cash > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.sale-quick-cash > div > button { padding-inline: .35rem; font-size: .875rem; }
 .sale-quick-cash button, .sale-exact-cash { min-height: 2.6rem; border: 1px solid #d5d5d5; border-radius: 999px; background: white; padding: .35rem 1rem; }
 .sale-exact-cash { display: flex; width: 100%; align-items: center; justify-content: space-between; }
 .sale-change-row { display: flex; align-items: center; justify-content: space-between; border-radius: 999px; background: #eff6ff; padding: .7rem 1rem; }
@@ -45,21 +49,33 @@
 .sale-inline-error { border: 1px solid #fecdd3; border-radius: .8rem; background: #fff1f2; padding: .8rem 1rem; color: #be123c; }
 .sales-flow-notice { margin-bottom: -.25rem; }
 .sales-loading { text-align: center; color: #64748b; }
-.sale-success-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; background: #172033d9; padding: 1rem; }
-.sale-success-dialog { display: grid; justify-items: center; width: min(100%, 34rem); border-radius: 1.6rem; background: #30394d; padding: 1.5rem; color: white; text-align: center; box-shadow: 0 20px 60px #0005; }
-.sale-success-check { display: grid; width: 3.6rem; height: 3.6rem; place-items: center; border-radius: 50%; background: #00bd2b; color: #08330f; font-size: 2.4rem; font-weight: 900; }
-.sale-success-dialog h2 { margin: .5rem 0; font-size: 1.5rem; }
-.sale-success-dialog p { margin: .5rem 0; }
-.sale-success-dialog dl { margin: .4rem 0 1rem; }
-.sale-success-dialog dl div { display: flex; justify-content: space-between; gap: 2rem; }
-.sale-success-dialog dd { margin: 0; font-weight: 700; }
-.sale-success-caption { margin-top: .7rem; font-size: .75rem; color: #cbd5e1; }
+.sale-receipt { text-align: center; }
+.sale-receipt h2 { margin: .5rem 0; font-size: 1.5rem; font-weight: 750; }
+.sale-success-check { display: grid; margin: auto; width: 3.6rem; height: 3.6rem; place-items: center; border-radius: 50%; background: #dcfce7; color: #166534; font-size: 2.4rem; font-weight: 900; }
+.sale-receipt-meta { margin-top: .35rem; overflow-wrap: anywhere; color: #475569; font-size: .78rem; }
+.sale-receipt-items { margin: .9rem 0; text-align: left; }
+.sale-receipt-items li { display: flex; justify-content: space-between; align-items: start; gap: .7rem; border-top: 1px solid #e2e8f0; padding: .6rem 0; }
+.sale-receipt-items li > strong { white-space: nowrap; }
+.sale-receipt-items li > div { min-width: 0; overflow-wrap: anywhere; }
+.sale-receipt-items p { color: #475569; font-size: .8rem; }
+.sale-receipt dl { margin: .75rem 0 1rem; }
+.sale-receipt dl div { display: flex; justify-content: space-between; gap: .8rem; padding: .2rem 0; }
+.sale-receipt dd { margin: 0; font-weight: 700; }
+.sale-receipt-total { border-top: 1px solid #cbd5e1; margin-top: .35rem; font-weight: 750; }
+@media (prefers-reduced-motion: no-preference) {
+  .sale-success-check { animation: sale-check-in 360ms ease-out both; }
+}
+@keyframes sale-check-in {
+  0% { opacity: 0; transform: scale(.55); }
+  70% { opacity: 1; transform: scale(1.13); }
+  100% { transform: scale(1); }
+}
 @media (max-width: 700px) {
   .sales-flow-header { grid-template-columns: auto 1fr; }
   .sales-flow-header h1 { grid-column: 1 / -1; grid-row: 1; }
   .sales-flow-header > :first-child { grid-row: 2; }
   .sales-cash-status { grid-column: 2; grid-row: 2; }
-  .sale-workspace { grid-template-columns: 1fr; gap: 1.2rem; }
+  .sale-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "search" "cart"; gap: 1.2rem; }
   .sale-payment-total { justify-content: space-between; }
   .sale-payment-actions { justify-content: center; }
   .sale-payment-actions button { width: 100%; }

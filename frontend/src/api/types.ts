@@ -28,9 +28,11 @@ export interface Product {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  has_photo?: boolean;
 }
 
 export interface ProductCreate {
+  photo?: string;
   sku: string;
   name: string;
   category: string;
@@ -43,6 +45,7 @@ export interface ProductCreate {
 }
 
 export interface ProductUpdate {
+  photo?: string | null;
   sku?: string;
   name?: string;
   category?: string;

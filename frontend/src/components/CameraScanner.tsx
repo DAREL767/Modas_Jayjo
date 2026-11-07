@@ -37,6 +37,12 @@ export function CameraScanner({ onClose, onDetected }: { onClose: () => void; on
         if (cancelled) return;
         stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } } });
         if (cancelled) { stop(); return; }
+        const track = stream.getVideoTracks?.()[0];
+        const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & { focusMode?: string[] }) | undefined;
+        if (track && capabilities?.focusMode?.includes("continuous")) {
+          const focus: MediaTrackConstraintSet & { focusMode: string } = { focusMode: "continuous" };
+          void track.applyConstraints({ advanced: [focus] }).catch(() => undefined);
+        }
         controls = await new BrowserMultiFormatReader().decodeFromStream(stream, video.current!, (result, _error, scanner) => {
           if (!result || cancelled || delivered) return;
           const code = result.getText().trim();
@@ -67,10 +73,10 @@ export function CameraScanner({ onClose, onDetected }: { onClose: () => void; on
   return <Modal titleId="camera-scanner-title" onClose={onClose}>
     <div className="space-y-4">
       <h2 id="camera-scanner-title" className="text-xl font-bold">Escanear código con cámara</h2>
-      <p className="text-sm text-slate-600">Apunta al código de barras de la etiqueta. Al leerlo volverás automáticamente a la prenda.</p>
+      <p className="text-sm text-slate-600">Encuadra la etiqueta completa, incluidos los márgenes. Si el código se ve borroso, aleja un poco la cámara.</p>
       <div className="relative overflow-hidden rounded-2xl bg-slate-950">
-        <video ref={video} autoPlay muted playsInline className="aspect-[4/3] w-full object-cover" aria-label="Vista de la cámara" />
-        <div className="pointer-events-none absolute inset-x-[10%] inset-y-[28%] rounded-xl border-2 border-white/80" aria-hidden="true" />
+        <video ref={video} autoPlay muted playsInline className="aspect-[4/3] w-full object-contain" aria-label="Vista de la cámara" />
+        <div className="pointer-events-none absolute inset-x-[8%] inset-y-[24%] rounded-xl border-2 border-white/80" aria-hidden="true" />
       </div>
       {error ? <Notice>{error}</Notice> : <p role="status" className="text-sm text-slate-600">{ready ? "Buscando código… Mantén la etiqueta enfocada y con buena luz." : "Iniciando cámara…"}</p>}
       <div className="flex flex-wrap justify-end gap-3">
