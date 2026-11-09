@@ -27,6 +27,17 @@ class SaleRepository:
     async def get_completed(self, sale_id: str, *, session=None) -> dict | None:
         return await self._collection().find_one({"sale_id": sale_id, "status": "completed"}, session=session)
 
+    async def list_completed(self, *, start, end, cash_session_id, reference, skip, limit) -> list[dict]:
+        query = {"status": "completed"}
+        if cash_session_id:
+            query["cash_session_id"] = cash_session_id
+        else:
+            query["created_at"] = {"$gte": start, "$lt": end}
+            if reference:
+                query["$or"] = [{"sale_id": reference.lower()}, {"items.sku": reference.upper()}]
+        rows = self._collection().find(query).sort([("created_at", -1), ("sale_id", -1)]).skip(skip).limit(limit)
+        return [row async for row in rows]
+
     async def record_return(self, sale_id: str, product_id: str, *, session) -> None:
         await self._collection().update_one(
             {"sale_id": sale_id}, {"$inc": {f"returned_units.{product_id}": 1}}, session=session,

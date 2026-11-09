@@ -1,6 +1,7 @@
+from datetime import UTC, date, datetime, time, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from app.api.authorization import require_roles
 from app.api.dependencies import get_sales_service
@@ -14,7 +15,7 @@ from app.modules.sales.errors import (
     SaleTotalTooLargeError,
     InvalidSaleDiscountError,
 )
-from app.modules.sales.schemas import SaleCreate, SaleResponse
+from app.modules.sales.schemas import SaleCreate, SaleHistoryEntry, SaleResponse
 from app.modules.sales.service import SalesService
 from app.modules.users.schemas import UserRole
 
@@ -22,6 +23,34 @@ from app.modules.users.schemas import UserRole
 router = APIRouter(prefix="/api/sales", tags=["Ventas"])
 SalesServiceDependency = Annotated[SalesService, Depends(get_sales_service)]
 require_staff = require_roles([UserRole.ADMIN, UserRole.VENDOR])
+
+
+@router.get("/history", response_model=list[SaleHistoryEntry])
+async def sale_history(
+    service: SalesServiceDependency,
+    current_user: Annotated[dict, Depends(require_staff)],
+    sale_date: date | None = None,
+    cash_session_id: Annotated[str | None, Query(pattern=r"^[0-9a-f]{24}$")] = None,
+    reference: Annotated[str, Query(max_length=40)] = "",
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=25)] = 15,
+):
+    start = end = None
+    if cash_session_id:
+        if current_user["role"] != UserRole.ADMIN.value:
+            raise HTTPException(403, "El detalle de cierres está reservado para administración.")
+        if sale_date is not None or reference.strip():
+            raise HTTPException(422, "Consulta el cierre o busca por fecha de venta.")
+    else:
+        if sale_date is None or sale_date == date.max:
+            raise HTTPException(422, "Selecciona una fecha de venta válida.")
+        bogota = timezone(timedelta(hours=-5))
+        start = datetime.combine(sale_date, time.min, bogota).astimezone(UTC)
+        end = start + timedelta(days=1)
+    return await service.history(
+        start=start, end=end, cash_session_id=cash_session_id,
+        reference=reference.strip(), skip=skip, limit=limit,
+    )
 
 
 def _raise_http_error(error: Exception) -> None:

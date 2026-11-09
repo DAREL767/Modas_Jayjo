@@ -35,6 +35,14 @@ class SalesService:
         self._sessions = sessions
         self._transactions = transactions
 
+    async def history(
+        self, *, start: datetime | None, end: datetime | None, cash_session_id: str | None,
+        reference: str, skip: int, limit: int,
+    ) -> list[dict]:
+        return await self._sales.list_completed(
+            start=start, end=end, cash_session_id=cash_session_id, reference=reference, skip=skip, limit=limit,
+        )
+
     async def create_sale(
         self, data: SaleCreate, *, actor_id: str, idempotency_key: str
     ) -> dict:

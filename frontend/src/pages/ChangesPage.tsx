@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "../api/endpoints";
-import type { ChangeRequest, ChangeStatus, Product, ProductChange, ReturnLine } from "../api/types";
+import type { ChangeRequest, ChangeStatus, Product, ProductChange, ReturnLine, SaleHistoryEntry } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
+import { SaleHistoryList } from "./sales/SaleHistoryList";
 
 const selectClass = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2";
 const labelClass = "grid gap-1.5 text-sm font-medium text-slate-700";
@@ -10,6 +11,9 @@ const statusNames: Record<ChangeStatus, string> = { pending: "Pendiente", approv
 const dateFormat = new Intl.DateTimeFormat("es-CO", {
   dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota",
 });
+const todayInBogota = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
+}).format(new Date());
 
 function differenceLabel(amount: number) {
   if (amount > 0) return `Cobrar al cliente ${formatCop(amount)}`;
@@ -25,23 +29,29 @@ function ProductPicker({ label, products, selected, onSelect, disabled }: {
   disabled: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const selectId = useId();
+  const chosen = products.find((item) => item.id === selected);
   const terms = search.trim().toLocaleLowerCase("es-CO").split(/\s+/);
   const matches = products.filter((item) => {
     const description = `${item.sku} ${item.name} ${item.size} ${item.color}`.toLocaleLowerCase("es-CO");
-    return item.id === selected || terms.every((term) => description.includes(term));
+    return terms.every((term) => description.includes(term));
   });
+  if (chosen) return <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3">
+    <p className="text-sm"><strong>{label}</strong><br />{chosen.name} · {chosen.sku} · {chosen.size} / {chosen.color} · {formatCop(chosen.unit_price_cop)}</p>
+    <Button type="button" variant="secondary" disabled={disabled} onClick={() => onSelect("")}>Cambiar selección</Button>
+  </div>;
   return <div className="space-y-2">
     <Field label={`Buscar ${label.toLowerCase()}`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, SKU, talla o color" disabled={disabled} />
-    <div className={labelClass}>
-      <label htmlFor={selectId}>{label}</label>
-      <select id={selectId} className={selectClass} value={selected} onChange={(event) => onSelect(event.target.value)} required disabled={disabled}>
-        <option value="">Selecciona una variante</option>
-        {matches.map((item) => <option key={item.id} value={item.id}>
-          {item.name} · {item.sku} · {item.size} / {item.color} · {item.stock_quantity} disponibles · {formatCop(item.unit_price_cop)}
-        </option>)}
-      </select>
-    </div>
+    {search.trim() && <>
+      {matches.length === 0 && <p className="text-sm text-slate-600">No hay variantes disponibles con esa búsqueda.</p>}
+      <ul className="space-y-1">
+        {matches.slice(0, 8).map((item) => <li key={item.id}>
+          <Button type="button" variant="secondary" className="w-full justify-start text-left" disabled={disabled} onClick={() => onSelect(item.id)}>
+            {item.name} · {item.sku} · {item.size} / {item.color} · {item.stock_quantity} disponibles · {formatCop(item.unit_price_cop)}
+          </Button>
+        </li>)}
+      </ul>
+      {matches.length > 8 && <p className="text-sm text-slate-600">Agrega talla, color o SKU para acotar los resultados.</p>}
+    </>}
   </div>;
 }
 
@@ -52,6 +62,10 @@ export function ChangesPage() {
   const [productId, setProductId] = useState("");
   const [replacementId, setReplacementId] = useState("");
   const [saleId, setSaleId] = useState("");
+  const [saleDate, setSaleDate] = useState(todayInBogota);
+  const [saleReference, setSaleReference] = useState("");
+  const [saleQuery, setSaleQuery] = useState("");
+  const [searchRevision, setSearchRevision] = useState(0);
   const [lines, setLines] = useState<ReturnLine[] | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,15 +84,16 @@ export function ChangesPage() {
 
   const selectedLine = lines?.find((line) => line.product_id === productId);
   const replacement = products.find((item) => item.id === replacementId);
-  const lookup = async () => {
-    if (!accessToken || busy || !saleId.trim()) return;
+  const lookup = async (sale: SaleHistoryEntry) => {
+    if (!accessToken || busy) return;
     setBusy(true);
     setError(null);
     setLines(null);
     setProductId("");
     setReplacementId("");
     try {
-      setLines(await api.returnLines(accessToken, saleId.trim()));
+      setLines(await api.returnLines(accessToken, sale.sale_id));
+      setSaleId(sale.sale_id);
     } catch (caught) {
       setError(caught);
     } finally {
@@ -106,6 +121,7 @@ export function ChangesPage() {
       setProductId("");
       setReplacementId("");
       setSaleId("");
+      setSaleQuery("");
       setLines(null);
       setReason("");
     } catch (caught) {
@@ -125,32 +141,44 @@ export function ChangesPage() {
       <label className={labelClass}>Tipo de novedad
         <select className={selectClass} value={kind} disabled={busy} onChange={(event) => {
           setKind(event.target.value as ChangeRequest["kind"]);
-          setProductId(""); setReplacementId(""); setLines(null); setSubmitted(null); setError(null); setReason("");
+          setProductId(""); setReplacementId(""); setSaleId(""); setLines(null); setSubmitted(null); setError(null); setReason("");
         }}>
           <option value="defect">Prenda dañada en inventario</option>
           <option value="exchange">Cambio solicitado por el cliente</option>
         </select>
       </label>
       {kind === "defect" ? <ProductPicker key="defect" label="Prenda dañada" products={products} selected={productId} onSelect={setProductId} disabled={busy} /> : <>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-0 flex-1">
-            <Field label="Número de la venta original" value={saleId} maxLength={40} disabled={busy} onChange={(event) => {
-              setSaleId(event.target.value); setLines(null); setProductId(""); setReplacementId("");
-            }} />
+        {!saleId ? <>
+          <div className="grid items-end gap-2 sm:grid-cols-[auto_1fr_auto]">
+            <Field label="Fecha de la venta" type="date" value={saleDate} disabled={busy} onChange={(event) => setSaleDate(event.target.value)} />
+            <Field label="SKU o número de venta (opcional)" value={saleReference} maxLength={40} disabled={busy} onChange={(event) => setSaleReference(event.target.value)} />
+            <Button type="button" variant="secondary" disabled={busy || !saleDate} onClick={() => {
+              setError(null);
+              setSaleQuery(new URLSearchParams({ sale_date: saleDate, reference: saleReference.trim() }).toString());
+              setSearchRevision((current) => current + 1);
+            }}>Buscar ventas</Button>
           </div>
-          <Button type="button" variant="secondary" disabled={busy || !saleId.trim()} onClick={() => void lookup()}>Buscar venta</Button>
-        </div>
+          {saleQuery && <SaleHistoryList key={searchRevision} query={saleQuery} onSelect={(sale) => void lookup(sale)} disabled={busy} />}
+        </> : <div className="space-y-2">
+          <p className="break-all text-sm text-slate-600">Venta seleccionada {saleId}</p>
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => {
+            setSaleId(""); setLines(null); setProductId(""); setReplacementId("");
+          }}>Elegir otra venta</Button>
+        </div>}
         {lines?.length === 0 && <Notice tone="info">Esta venta ya no tiene unidades disponibles para cambio.</Notice>}
-        {!!lines?.length && <label className={labelClass}>Prenda que devuelve el cliente
-          <select className={selectClass} required value={productId} disabled={busy} onChange={(event) => {
-            setProductId(event.target.value); setReplacementId("");
-          }}>
-            <option value="">Selecciona una prenda de la venta</option>
-            {lines.map((line) => <option key={line.product_id} value={line.product_id}>
-              {line.name} · {line.sku} · {line.size} / {line.color} · {formatCop(line.credit_cop)} pagados por esta unidad
-            </option>)}
-          </select>
-        </label>}
+        {!!lines?.length && <div className="space-y-2">
+          <p className="text-sm font-semibold">Prenda que devuelve el cliente</p>
+          <ul className="max-h-64 space-y-1 overflow-y-auto">
+            {lines.map((line) => <li key={line.product_id}>
+              <Button type="button" className="w-full justify-start text-left" variant={productId === line.product_id ? "primary" : "secondary"}
+                aria-pressed={productId === line.product_id} disabled={busy} onClick={() => {
+                  if (productId !== line.product_id) { setProductId(line.product_id); setReplacementId(""); }
+                }}>
+                {line.name} · {line.sku} · {line.size} / {line.color} · {formatCop(line.credit_cop)} por unidad · {line.remaining} disponibles para cambio
+              </Button>
+            </li>)}
+          </ul>
+        </div>}
         {selectedLine && <ProductPicker key={productId} label="Prenda que se entrega" products={products.filter((item) => item.id !== productId)}
           selected={replacementId} onSelect={setReplacementId} disabled={busy} />}
         {selectedLine && replacement && <Notice tone="info">

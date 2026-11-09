@@ -3,6 +3,8 @@ import { api } from "../api/endpoints";
 import type { CashSession } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
+import { Modal } from "../components/Modal";
+import { SaleHistoryList } from "./sales/SaleHistoryList";
 
 const todayInBogota = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
@@ -16,6 +18,7 @@ export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSessio
   const [startDate, setStartDate] = useState(todayInBogota);
   const [endDate, setEndDate] = useState(todayInBogota);
   const [history, setHistory] = useState<CashSession[]>([]);
+  const [selectedClose, setSelectedClose] = useState<CashSession | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -105,6 +108,35 @@ export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSessio
     </div>
   </Panel>{isAdmin && !onOpened && <Panel title="Historial de cierres" description="Consulta los arqueos registrados por fecha.">
     <div className="flex flex-wrap items-end gap-3"><Field label="Desde" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required /><Field label="Hasta" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} required /><Button disabled={working || endDate < startDate} onClick={() => void loadHistory()}>Buscar cierres</Button></div>
-    {history.length === 0 ? <p className="mt-5 text-sm text-slate-500">No hay cierres para mostrar en el rango seleccionado.</p> : <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">Fecha</th><th className="py-2">Ventas efectivo</th><th className="py-2">Contado</th><th className="py-2">Diferencia</th><th className="py-2">Notas</th></tr></thead><tbody className="divide-y divide-slate-100">{history.map((closed) => <tr key={closed.id}><td className="py-3">{closed.closed_at ? new Date(closed.closed_at).toLocaleString("es-CO") : "—"}</td><td>{formatCop(closed.sales_cash_cop)}</td><td>{formatCop(closed.exchange_cash_cop ?? 0)}</td><td>{closed.counted_cash_cop == null ? "—" : formatCop(closed.counted_cash_cop)}</td><td>{closed.difference_cash_cop == null ? "—" : formatCop(closed.difference_cash_cop)}</td><td className="max-w-64 truncate">{closed.closing_note || "—"}</td></tr>)}</tbody></table></div>}
+    {history.length === 0 ? <p className="mt-5 text-sm text-slate-500">No hay cierres para mostrar en el rango seleccionado.</p> :
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500"><tr>
+            <th className="py-2">Fecha</th><th>Ventas efectivo</th><th>Cambios netos</th><th>Contado</th><th>Diferencia</th><th>Notas</th>
+          </tr></thead>
+          <tbody className="divide-y divide-slate-100">{history.map((closed) => <tr key={closed.id}>
+            <td className="py-3">
+              <button type="button" className="text-left font-medium text-blue-700 underline" onClick={() => setSelectedClose(closed)}>
+                {closed.closed_at ? new Date(closed.closed_at).toLocaleString("es-CO") : "Ver detalle del cierre"}
+              </button>
+            </td>
+            <td>{formatCop(closed.sales_cash_cop)}</td>
+            <td>{formatCop(closed.exchange_cash_cop ?? 0)}</td>
+            <td>{closed.counted_cash_cop == null ? "—" : formatCop(closed.counted_cash_cop)}</td>
+            <td>{closed.difference_cash_cop == null ? "—" : formatCop(closed.difference_cash_cop)}</td>
+            <td className="max-w-64 truncate">{closed.closing_note || "—"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+    {selectedClose && <Modal titleId="cash-close-detail" onClose={() => setSelectedClose(null)}>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="cash-close-detail" className="text-lg font-semibold">Ventas del cierre</h2>
+          <Button type="button" variant="secondary" onClick={() => setSelectedClose(null)}>Cerrar detalle</Button>
+        </div>
+        <p className="text-sm text-slate-600">Ventas en efectivo {formatCop(selectedClose.sales_cash_cop)} · Cambios netos {formatCop(selectedClose.exchange_cash_cop ?? 0)}</p>
+        <SaleHistoryList key={selectedClose.id} query={new URLSearchParams({ cash_session_id: selectedClose.id }).toString()} />
+      </div>
+    </Modal>}
   </Panel>}</div>;
 }

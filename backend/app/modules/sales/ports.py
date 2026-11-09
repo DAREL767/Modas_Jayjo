@@ -1,8 +1,13 @@
+from datetime import datetime
 from typing import Protocol
 
 class SaleRepositoryPort(Protocol):
     async def create(self, sale: dict, *, session) -> dict: ...
     async def get_by_idempotency_key(self, key: str) -> dict | None: ...
+    async def list_completed(
+        self, *, start: datetime | None, end: datetime | None, cash_session_id: str | None,
+        reference: str, skip: int, limit: int,
+    ) -> list[dict]: ...
 
 
 class SaleInventoryPort(Protocol):

@@ -7,13 +7,12 @@ import reportsIcon from "../assets/icons/icon-reportes.png";
 import profileIcon from "../assets/icons/icon-perfil.png";
 import "./dashboard.css";
 
-export type PageKey = "dashboard" | "sales" | "inventory" | "cash" | "users" | "changes" | "reports";
+export type PageKey = "dashboard" | "sales" | "inventory" | "cash" | "users" | "reports";
 export type DashboardSection = "operation" | "administration";
 type Module = { key: string; page?: PageKey; icon: string; title: string; description: string; button: string };
 const operation: Module[] = [
   { key: "sales", page: "sales", icon: saleIcon, title: "Nueva Venta (POS)", description: "Escanea prendas y procesa cobros.", button: "Iniciar venta" },
   { key: "inventory", page: "inventory", icon: inventoryIcon, title: "Inventario de Prendas", description: "Consulta existencias y registra prendas.", button: "Ver inventario" },
-  { key: "changes", page: "changes", icon: reportsIcon, title: "Cambios", description: "Solicita un cambio de cliente o reporta una prenda dañada.", button: "Cambios" },
 ];
 const administration: Module[] = [
   { key: "finance", page: "inventory", icon: financeIcon, title: "Gestión y Finanzas", description: "Administra precios, costos y prendas del inventario.", button: "Administrar inventario" },
