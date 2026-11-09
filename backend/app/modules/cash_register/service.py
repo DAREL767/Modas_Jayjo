@@ -43,7 +43,7 @@ class CashRegisterService:
         current = await self._sessions.get_open_session()
         if current is None:
             raise CashSessionNotOpenError
-        expected = current["opening_cash_cop"] + current["sales_cash_cop"]
+        expected = current["opening_cash_cop"] + current["sales_cash_cop"] + current.get("exchange_cash_cop", 0)
         data = {
             "status": "closed",
             "closed_by": actor_id,

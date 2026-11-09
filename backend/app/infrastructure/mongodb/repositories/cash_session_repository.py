@@ -45,11 +45,26 @@ class CashSessionRepository:
         return result.modified_count == 1
 
     async def close_session(self, session_id: str, data: dict) -> dict | None:
+        values = {key: {"$literal": value} for key, value in data.items()}
+        # Compute against the balance at the instant of closing, including concurrent sales.
+        values["expected_cash_cop"] = {
+            "$add": ["$opening_cash_cop", "$sales_cash_cop", {"$ifNull": ["$exchange_cash_cop", 0]}],
+        }
         return await self._collection().find_one_and_update(
             {"_id": ObjectId(session_id), "status": "open"},
-            {"$set": data},
+            [
+                {"$set": values},
+                {"$set": {"difference_cash_cop": {"$subtract": ["$counted_cash_cop", "$expected_cash_cop"]}}},
+            ],
             return_document=ReturnDocument.AFTER,
         )
+
+    async def add_exchange_cash(self, session_id: str, amount: int, *, session) -> bool:
+        result = await self._collection().update_one(
+            {"_id": ObjectId(session_id), "status": "open"},
+            {"$inc": {"exchange_cash_cop": amount}}, session=session,
+        )
+        return result.matched_count == 1
 
     async def list_closed_sessions(
         self, start_at: datetime, end_at: datetime, *, skip: int, limit: int

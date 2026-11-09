@@ -6,6 +6,7 @@ import { InventoryPage } from "./pages/InventoryPage";
 import { SalesPage } from "./pages/SalesPage";
 import { CashRegisterPage } from "./pages/CashRegisterPage";
 import { UsersPage } from "./pages/UsersPage";
+import { ChangesPage, ChangeReportsPage } from "./pages/ChangesPage";
 import { Button } from "./components/Panel";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import type { User } from "./api/types";
@@ -22,7 +23,7 @@ function Workspace({ user, signOut }: { user: User; signOut: () => void }) {
   const [page, setPage] = useState<PageKey>("dashboard");
   const [section, setSection] = useState<DashboardSection>("operation");
   const navigate = (next: PageKey) => {
-    if (user.role !== "admin" && (next === "cash" || next === "users")) return;
+    if (user.role !== "admin" && (next === "cash" || next === "users" || next === "reports")) return;
     setPage(next);
   };
 
@@ -32,6 +33,8 @@ function Workspace({ user, signOut }: { user: User; signOut: () => void }) {
     inventory: "Inventario",
     cash: "Cierre de caja",
     users: "Personal",
+    changes: "Cambios",
+    reports: "Reportes de novedades",
   };
   const content = {
     dashboard: <DashboardPage user={user} section={section} onNavigate={navigate} />,
@@ -39,6 +42,8 @@ function Workspace({ user, signOut }: { user: User; signOut: () => void }) {
     inventory: <InventoryPage />,
     cash: <CashRegisterPage />,
     users: <UsersPage />,
+    changes: <ChangesPage />,
+    reports: <ChangeReportsPage />,
   }[page];
 
   return (

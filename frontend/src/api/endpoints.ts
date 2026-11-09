@@ -1,6 +1,9 @@
 import { requestJson } from "./client";
 import type {
   CashSession,
+  ChangeRequest,
+  ProductChange,
+  ReturnLine,
   Product,
   ProductCreate,
   ProductUpdate,
@@ -63,6 +66,16 @@ export const api = {
       },
       token,
     ),
+  returnLines: (token: string, saleId: string) =>
+    requestJson<ReturnLine[]>(`/api/changes/sale/${encodeURIComponent(saleId)}`, {}, token),
+  createChange: (token: string, change: ChangeRequest, requestId: string) =>
+    requestJson<ProductChange>("/api/changes/", {
+      method: "POST", headers: { "Idempotency-Key": requestId }, body: JSON.stringify(change),
+    }, token),
+  changes: (token: string, params: URLSearchParams) =>
+    requestJson<ProductChange[]>(`/api/changes/?${params}`, {}, token),
+  resolveChange: (token: string, id: string, decision: "approve" | "reject") =>
+    requestJson<ProductChange>(`/api/changes/${encodeURIComponent(id)}/${decision}`, { method: "POST" }, token),
   currentCashSession: (token: string) =>
     requestJson<CashSession | null>("/api/cash-register/current", {}, token),
   openCashSession: (token: string, opening_cash_cop: number, note?: string) =>

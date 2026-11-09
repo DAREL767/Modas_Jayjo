@@ -7,17 +7,18 @@ import reportsIcon from "../assets/icons/icon-reportes.png";
 import profileIcon from "../assets/icons/icon-perfil.png";
 import "./dashboard.css";
 
-export type PageKey = "dashboard" | "sales" | "inventory" | "cash" | "users";
+export type PageKey = "dashboard" | "sales" | "inventory" | "cash" | "users" | "changes" | "reports";
 export type DashboardSection = "operation" | "administration";
 type Module = { key: string; page?: PageKey; icon: string; title: string; description: string; button: string };
 const operation: Module[] = [
   { key: "sales", page: "sales", icon: saleIcon, title: "Nueva Venta (POS)", description: "Escanea prendas y procesa cobros.", button: "Iniciar venta" },
   { key: "inventory", page: "inventory", icon: inventoryIcon, title: "Inventario de Prendas", description: "Consulta existencias y registra prendas.", button: "Ver inventario" },
+  { key: "changes", page: "changes", icon: reportsIcon, title: "Cambios", description: "Solicita un cambio de cliente o reporta una prenda dañada.", button: "Cambios" },
 ];
 const administration: Module[] = [
   { key: "finance", page: "inventory", icon: financeIcon, title: "Gestión y Finanzas", description: "Administra precios, costos y prendas del inventario.", button: "Administrar inventario" },
   { key: "cash", page: "cash", icon: cashIcon, title: "Cierre de Caja Diario", description: "Realiza el arqueo de efectivo y consulta los cierres del día.", button: "Realizar arqueo" },
-  { key: "reports", icon: reportsIcon, title: "Reportes de Novedades", description: "Consulta las novedades de prendas reportadas por el equipo.", button: "Próximamente" },
+  { key: "reports", page: "reports", icon: reportsIcon, title: "Reportes de Novedades", description: "Aprueba solicitudes y consulta el historial de cambios.", button: "Ver reportes" },
   { key: "users", page: "users", icon: profileIcon, title: "Personal Autorizado", description: "Gestiona las cuentas, los roles y el acceso del equipo.", button: "Gestionar personal" },
 ];
 

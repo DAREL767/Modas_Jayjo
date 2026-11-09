@@ -125,7 +125,8 @@ class InventoryRepository:
         return await MongoTransactionRunner().run(operation)
 
     async def adjust_stock(
-        self, product_id: str, delta: int, reason: str, actor_id: str
+        self, product_id: str, delta: int, reason: str, actor_id: str,
+        *, session=None, change_id: str | None = None,
     ) -> dict | None:
         product_oid = self._object_id(product_id)
         query = {"_id": product_oid, "is_active": {"$ne": False}}
@@ -164,11 +165,14 @@ class InventoryRepository:
                     "actor_id": actor_id,
                     "stock_after": product["stock_quantity"],
                     "created_at": datetime.now(UTC),
+                    **({"change_id": change_id} if change_id else {}),
                 },
                 session=session,
             )
             return product
 
+        if session is not None:
+            return await operation(session)
         return await MongoTransactionRunner().run(operation)
 
     async def decrement_for_sale(
