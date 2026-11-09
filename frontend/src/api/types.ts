@@ -75,7 +75,7 @@ export interface SaleLine {
   unit_discount_cop?: number;
 }
 
-export interface Sale {
+export interface SaleHistoryEntry {
   sale_id: string;
   status: "completed";
   items: SaleLine[];
@@ -85,10 +85,13 @@ export interface Sale {
   global_discount_cop?: number;
   cash_received_cop: number;
   change_cop: number;
+  created_at: string;
+}
+
+export interface Sale extends SaleHistoryEntry {
   cashier_id: string;
   cash_session_id: string;
   idempotency_key: string;
-  created_at: string;
 }
 
 export interface CashSession {

@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -224,6 +224,16 @@ async def _check_changes(inventory):
         ),
         actor_id="vendor", idempotency_key="changes-test-sale",
     )
+    start = datetime.now(UTC) - timedelta(hours=1)
+    end = start + timedelta(days=1)
+    by_sku = await sales.list_completed(
+        start=start, end=end, cash_session_id=None, reference="m", skip=0, limit=10,
+    )
+    by_close = await sales.list_completed(
+        start=None, end=None, cash_session_id=sale["cash_session_id"], reference="", skip=0, limit=10,
+    )
+    assert [row["sale_id"] for row in by_sku] == [sale["sale_id"]]
+    assert [row["sale_id"] for row in by_close] == [sale["sale_id"]]
     exchange = ChangeCreate(
         kind="exchange", sale_id=sale["sale_id"], product_id=returned_id,
         replacement_id=replacement_id, reason="La persona necesita talla L",

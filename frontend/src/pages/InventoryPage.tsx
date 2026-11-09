@@ -4,6 +4,7 @@ import type { Product, ProductCreate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
 import { CameraScanButton } from "../components/CameraScanner";
+import { ChangesPage } from "./ChangesPage";
 
 const emptyProduct: ProductCreate = {
   sku: "",
@@ -50,6 +51,7 @@ export function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [draft, setDraft] = useState<ProductCreate>(emptyProduct);
   const [registering, setRegistering] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [delta, setDelta] = useState(1);
@@ -182,9 +184,20 @@ export function InventoryPage() {
     }
   };
 
+  if (showChanges) return <div className="space-y-4">
+    <Button type="button" variant="secondary" onClick={() => {
+      setShowChanges(false);
+      void reload();
+    }}>← Volver al inventario</Button>
+    <ChangesPage />
+  </div>;
+
   return (
     <div className="space-y-6">
-      {!registering && <Panel title="Inventario de prendas" description="Cada registro representa una variante de talla y color." action={<Button onClick={() => { setError(null); setNotice(""); setRegistering(true); }}>Agregar prenda</Button>}>
+      {!registering && <Panel title="Inventario de prendas" description="Cada registro representa una variante de talla y color." action={<div className="flex flex-wrap gap-2">
+        <Button onClick={() => { setError(null); setNotice(""); setRegistering(true); }}>Agregar prenda</Button>
+        <Button variant="secondary" onClick={() => setShowChanges(true)}>Cambios</Button>
+      </div>}>
         <div className="space-y-4">
           <label className="block max-w-lg text-sm font-medium text-slate-700">
             Buscar por prenda, SKU, categoría o variante

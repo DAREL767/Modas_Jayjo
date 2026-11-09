@@ -8,6 +8,7 @@ import type {
   ProductCreate,
   ProductUpdate,
   Sale,
+  SaleHistoryEntry,
   SaleRequest,
   TokenResponse,
   User,
@@ -68,6 +69,8 @@ export const api = {
     ),
   returnLines: (token: string, saleId: string) =>
     requestJson<ReturnLine[]>(`/api/changes/sale/${encodeURIComponent(saleId)}`, {}, token),
+  saleHistory: (token: string, params: URLSearchParams, signal?: AbortSignal) =>
+    requestJson<SaleHistoryEntry[]>(`/api/sales/history?${params}`, { signal }, token),
   createChange: (token: string, change: ChangeRequest, requestId: string) =>
     requestJson<ProductChange>("/api/changes/", {
       method: "POST", headers: { "Idempotency-Key": requestId }, body: JSON.stringify(change),

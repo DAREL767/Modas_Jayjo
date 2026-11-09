@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 class SaleLineRequest(BaseModel):
     product_id: str = Field(min_length=24, max_length=24)
@@ -35,7 +35,7 @@ class SaleLineResponse(BaseModel):
     unit_discount_cop: int = 0
 
 
-class SaleResponse(BaseModel):
+class SaleHistoryEntry(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     sale_id: str
@@ -47,7 +47,15 @@ class SaleResponse(BaseModel):
     global_discount_cop: int = 0
     cash_received_cop: int
     change_cop: int
+    created_at: datetime
+
+    @field_validator("created_at")
+    @classmethod
+    def utc_from_mongo(cls, value: datetime) -> datetime:
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+class SaleResponse(SaleHistoryEntry):
     cashier_id: str
     cash_session_id: str
     idempotency_key: str
-    created_at: datetime
