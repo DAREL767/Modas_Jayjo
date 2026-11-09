@@ -10,11 +10,13 @@ from app.infrastructure.mongodb.repositories.inventory_repository import (
     InventoryRepository,
 )
 from app.infrastructure.mongodb.repositories.sales_repository import SaleRepository
+from app.infrastructure.mongodb.repositories.change_repository import ChangeRepository
 from app.infrastructure.mongodb.repositories.user_repository import UserRepository
 from app.infrastructure.mongodb.transactions import MongoTransactionRunner
 from app.modules.auth.google_service import GoogleAuthService
 from app.modules.auth.service import AuthService
 from app.modules.cash_register.service import CashRegisterService
+from app.modules.changes.service import ChangeService
 from app.modules.inventory.service import InventoryService
 from app.modules.sales.service import SalesService
 from app.modules.users.service import UserService
@@ -34,6 +36,13 @@ def get_inventory_service() -> InventoryService:
 
 def get_cash_register_service() -> CashRegisterService:
     return CashRegisterService(CashSessionRepository())
+
+
+def get_change_service() -> ChangeService:
+    return ChangeService(
+        ChangeRepository(), InventoryRepository(), SaleRepository(),
+        CashSessionRepository(), MongoTransactionRunner(),
+    )
 
 
 def get_sales_service() -> SalesService:

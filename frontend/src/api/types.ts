@@ -96,6 +96,7 @@ export interface CashSession {
   status: "open" | "closed";
   opening_cash_cop: number;
   sales_cash_cop: number;
+  exchange_cash_cop?: number;
   expected_cash_cop?: number | null;
   counted_cash_cop?: number | null;
   difference_cash_cop?: number | null;
@@ -105,6 +106,42 @@ export interface CashSession {
   closed_at?: string | null;
   opening_note?: string | null;
   closing_note?: string | null;
+}
+
+export type ChangeStatus = "pending" | "approved" | "rejected";
+
+export interface ChangeProduct {
+  product_id: string;
+  sku: string;
+  name: string;
+  size: string;
+  color: string;
+}
+
+export interface ReturnLine extends ChangeProduct {
+  remaining: number;
+  credit_cop: number;
+}
+
+export interface ChangeRequest {
+  kind: "defect" | "exchange";
+  product_id: string;
+  reason: string;
+  sale_id?: string | null;
+  replacement_id?: string | null;
+}
+
+export interface ProductChange extends ChangeRequest {
+  id: string;
+  status: ChangeStatus;
+  product: ChangeProduct;
+  replacement?: ChangeProduct | null;
+  credit_cop: number;
+  replacement_price_cop: number;
+  difference_cop: number;
+  created_at: string;
+  resolved_at?: string | null;
+  cash_session_id?: string | null;
 }
 
 export interface UserCreate {

@@ -19,7 +19,7 @@ describe("DashboardPage role permissions", () => {
     expect(screen.getByRole("heading", { name: "Cierre de Caja Diario" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Personal Autorizado" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Gestión y Finanzas" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Próximamente" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Ver reportes" })).toBeEnabled();
     expect(screen.getAllByText("Sin datos disponibles")).toHaveLength(3);
   });
 

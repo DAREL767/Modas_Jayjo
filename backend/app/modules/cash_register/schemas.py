@@ -29,6 +29,7 @@ class CashSessionResponse(BaseModel):
     status: str
     opening_cash_cop: int
     sales_cash_cop: int = 0
+    exchange_cash_cop: int = 0
     expected_cash_cop: int | None = None
     counted_cash_cop: int | None = None
     difference_cash_cop: int | None = None

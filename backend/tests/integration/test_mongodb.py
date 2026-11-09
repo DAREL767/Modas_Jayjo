@@ -12,6 +12,15 @@ from app.infrastructure.mongodb import client as mongo_client
 from app.infrastructure.mongodb.indexes.user_indexes import ensure_user_indexes
 from app.infrastructure.mongodb.collections import get_inventory_collection, get_inventory_movements_collection
 from app.infrastructure.mongodb.repositories.inventory_repository import InventoryRepository
+from app.infrastructure.mongodb.repositories.cash_session_repository import CashSessionRepository
+from app.infrastructure.mongodb.repositories.change_repository import ChangeRepository
+from app.infrastructure.mongodb.repositories.sales_repository import SaleRepository
+from app.infrastructure.mongodb.transactions import MongoTransactionRunner
+from app.modules.cash_register.service import CashRegisterService
+from app.modules.changes.schemas import ChangeCreate
+from app.modules.changes.service import ChangeError, ChangeService
+from app.modules.sales.schemas import SaleCreate
+from app.modules.sales.service import SalesService
 from app.infrastructure.mongodb.maintenance.user_maintenance_repository import (
     UserMaintenanceRepository,
 )
@@ -166,6 +175,7 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         assert await inventory.adjust_stock(product_id, 2, "Ajuste de prueba", "test-admin") is None
         movements = get_inventory_movements_collection()
         assert await movements.count_documents({"product_id": product["_id"], "reason": "product_deleted", "delta": -3}) == 1
+        await _check_changes(inventory)
     except Exception as exc:
         operation_error = exc
         raise
@@ -187,3 +197,70 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
                     )
         finally:
             await mongo_client.close_mongo_connection()
+
+
+async def _check_changes(inventory):
+    cash = CashSessionRepository()
+    sales = SaleRepository()
+    reports = ChangeRepository()
+    transactions = MongoTransactionRunner()
+    service = ChangeService(reports, inventory, sales, cash, transactions)
+    cash_service = CashRegisterService(cash)
+    await cash_service.open_session(10_000, "admin")
+
+    async def create_variant(sku, price, stock):
+        product = await inventory.create({
+            "sku": sku, "name": "Camisa", "size": sku, "color": "Azul", "is_active": True,
+            "stock_quantity": stock, "unit_price_cop": price, "created_at": datetime.now(UTC),
+        }, actor_id="admin")
+        return str(product["_id"])
+
+    returned_id = await create_variant("M", 10_000, 2)
+    replacement_id = await create_variant("L", 6_000, 1)
+    sale = await SalesService(sales, inventory, cash, transactions).create_sale(
+        SaleCreate(
+            items=[{"product_id": returned_id, "quantity": 1}],
+            global_discount_cop=3_000, cash_received_cop=7_000,
+        ),
+        actor_id="vendor", idempotency_key="changes-test-sale",
+    )
+    exchange = ChangeCreate(
+        kind="exchange", sale_id=sale["sale_id"], product_id=returned_id,
+        replacement_id=replacement_id, reason="La persona necesita talla L",
+    )
+    request_id = str(uuid4())
+    report = await service.create(exchange, actor_id="vendor", request_id=request_id)
+    assert report["status"] == "pending"
+    assert report["credit_cop"] == 7_000 and report["difference_cop"] == -1_000
+    assert (await inventory.get_by_id(returned_id))["stock_quantity"] == 1
+    assert (await inventory.get_by_id(replacement_id))["stock_quantity"] == 1
+
+    await inventory.adjust_stock(replacement_id, -1, "Agotar reemplazo para prueba", "admin")
+    with pytest.raises(ChangeError):
+        await service.approve(request_id, actor_id="admin")
+    assert (await reports.get(request_id))["status"] == "pending"
+    assert (await cash.get_open_session()).get("exchange_cash_cop", 0) == 0
+    assert (await inventory.get_by_id(returned_id))["stock_quantity"] == 1
+
+    await inventory.adjust_stock(replacement_id, 1, "Restablecer reemplazo para prueba", "admin")
+    approved = await service.approve(request_id, actor_id="admin")
+    assert approved["status"] == "approved" and approved["cash_session_id"]
+    with pytest.raises(ChangeError):
+        await service.approve(request_id, actor_id="admin")
+    assert (await service.create(exchange, actor_id="vendor", request_id=request_id))["status"] == "approved"
+    assert (await inventory.get_by_id(returned_id))["stock_quantity"] == 2
+    assert (await inventory.get_by_id(replacement_id))["stock_quantity"] == 0
+    assert (await cash.get_open_session())["exchange_cash_cop"] == -1_000
+    assert await service.sale_lines(sale["sale_id"]) == []
+
+    defect_id = str(uuid4())
+    await service.create(
+        ChangeCreate(kind="defect", product_id=returned_id, reason="Costura abierta"),
+        actor_id="vendor", request_id=defect_id,
+    )
+    await service.approve(defect_id, actor_id="admin")
+    assert (await inventory.get_by_id(returned_id))["stock_quantity"] == 1
+    results = await reports.list(state="approved", start=None, end=None, search="Costura", skip=0, limit=20)
+    assert [item["id"] for item in results] == [defect_id]
+    closed = await cash_service.close_session(16_000, "admin")
+    assert closed["expected_cash_cop"] == 16_000 and closed["difference_cash_cop"] == 0

@@ -23,3 +23,11 @@ class SaleRepository:
 
     async def get_by_idempotency_key(self, key: str) -> dict | None:
         return await self._collection().find_one({"idempotency_key": key})
+
+    async def get_completed(self, sale_id: str, *, session=None) -> dict | None:
+        return await self._collection().find_one({"sale_id": sale_id, "status": "completed"}, session=session)
+
+    async def record_return(self, sale_id: str, product_id: str, *, session) -> None:
+        await self._collection().update_one(
+            {"sale_id": sale_id}, {"$inc": {f"returned_units.{product_id}": 1}}, session=session,
+        )
