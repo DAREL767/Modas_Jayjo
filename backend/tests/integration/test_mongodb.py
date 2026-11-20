@@ -15,6 +15,9 @@ from app.infrastructure.mongodb.repositories.inventory_repository import Invento
 from app.infrastructure.mongodb.repositories.cash_session_repository import CashSessionRepository
 from app.infrastructure.mongodb.repositories.change_repository import ChangeRepository
 from app.infrastructure.mongodb.repositories.sales_repository import SaleRepository
+from app.infrastructure.mongodb.repositories.dashboard_repository import DashboardRepository
+from app.infrastructure.mongodb.collections import get_sales_collection
+from app.modules.dashboard.service import DashboardService
 from app.infrastructure.mongodb.transactions import MongoTransactionRunner
 from app.modules.cash_register.service import CashRegisterService
 from app.modules.changes.schemas import ChangeCreate
@@ -176,6 +179,7 @@ async def test_mongodb_connection_and_isolated_crud(monkeypatch):
         movements = get_inventory_movements_collection()
         assert await movements.count_documents({"product_id": product["_id"], "reason": "product_deleted", "delta": -3}) == 1
         await _check_changes(inventory)
+        await _check_dashboard()
     except Exception as exc:
         operation_error = exc
         raise
@@ -274,3 +278,39 @@ async def _check_changes(inventory):
     assert [item["id"] for item in results] == [defect_id]
     closed = await cash_service.close_session(16_000, "admin")
     assert closed["expected_cash_cop"] == 16_000 and closed["difference_cash_cop"] == 0
+
+
+async def _check_dashboard():
+    repository = DashboardRepository()
+    service = DashboardService(repository)
+    # Use an isolated historical day so other fixtures cannot affect these totals.
+    start = datetime(2000, 1, 1, 5, tzinfo=UTC)
+    end = start + timedelta(days=1)
+    sales = get_sales_collection()
+    fixtures = [
+        (start, "completed", 12000, 2),
+        (end - timedelta(microseconds=1), "completed", 8000, 3),
+        (start - timedelta(microseconds=1), "completed", 90000, 1),
+        (end, "completed", 90000, 1),
+        (start, "cancelled", 90000, 1),
+    ]
+    for created_at, status, total, quantity in fixtures:
+        await sales.insert_one({
+            "sale_id": str(uuid4()), "status": status, "created_at": created_at,
+            "total_cop": total, "items": [{"quantity": quantity}],
+        })
+    inventory = get_inventory_collection()
+    low_before = await repository.low_stock_count()
+    low_product = await inventory.insert_one({
+        "is_active": True, "stock_quantity": 2, "low_stock_threshold": 2,
+    })
+    await inventory.insert_many([
+        {"is_active": False, "stock_quantity": 0, "low_stock_threshold": 2},
+        {"is_active": True, "stock_quantity": -1, "low_stock_threshold": 2},
+    ])
+    metrics = await service.metrics(start)
+    assert metrics["sales_total_cop"] == 20000
+    assert metrics["units_sold"] == 5
+    assert metrics["low_stock_count"] == low_before + 1
+    await inventory.update_one({"_id": low_product.inserted_id}, {"$set": {"stock_quantity": 3}})
+    assert (await service.metrics(start))["low_stock_count"] == low_before

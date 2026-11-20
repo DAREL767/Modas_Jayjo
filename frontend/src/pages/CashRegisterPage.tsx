@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
 import { Modal } from "../components/Modal";
 import { SaleHistoryList } from "./sales/SaleHistoryList";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 
 const todayInBogota = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
@@ -19,6 +20,7 @@ export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSessio
   const [endDate, setEndDate] = useState(todayInBogota);
   const [history, setHistory] = useState<CashSession[]>([]);
   const [selectedClose, setSelectedClose] = useState<CashSession | null>(null);
+  const [historyRange, setHistoryRange] = useState<[string, string] | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -39,6 +41,17 @@ export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSessio
     finally { setLoading(false); }
   }, [accessToken, onOpened]);
   useEffect(() => { void reload(); }, [reload]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const [current, closures] = await Promise.all([
+      api.currentCashSession(accessToken, signal),
+      historyRange && isAdmin ? api.cashHistory(accessToken, historyRange[0], historyRange[1], signal) : Promise.resolve(null),
+    ]);
+    if (signal.aborted) return;
+    setSession((previous) => current ?? (previous?.status === "closed" ? previous : null));
+    if (closures) setHistory(closures);
+    if (current?.status === "open") onOpened?.(current);
+  }, !!accessToken && !loading && !working);
 
   const openSession = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,14 +80,17 @@ export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSessio
   const loadHistory = async () => {
     if (!accessToken || !isAdmin) return;
     setWorking(true); setError(null);
-    try { setHistory(await api.cashHistory(accessToken, startDate, endDate)); }
+    try {
+      setHistory(await api.cashHistory(accessToken, startDate, endDate));
+      setHistoryRange([startDate, endDate]);
+    }
     catch (caught) { setError(caught); }
     finally { setWorking(false); }
   };
 
   return <div className="space-y-6"><Panel title={onOpened ? "Abrir caja para vender" : "Cierre de caja diario"} description={onOpened ? "Al abrir la caja regresarás automáticamente a la venta." : "Consulta el estado y, como administrador, registra el arqueo y el cierre."}>
     <div className="space-y-5">
-      {error !== null && <ErrorNotice error={error} />}{notice && <Notice tone="success">{notice}</Notice>}
+      {(error ?? refreshError) != null && <ErrorNotice error={error ?? refreshError} />}{notice && <Notice tone="success">{notice}</Notice>}
       {loading ? <p className="py-8 text-center text-sm text-slate-500">Consultando caja…</p> : !session ? <>
         <Notice tone="info">No hay una caja abierta actualmente.</Notice>
         {isAdmin && <form className="grid gap-4 sm:grid-cols-2" onSubmit={openSession}>

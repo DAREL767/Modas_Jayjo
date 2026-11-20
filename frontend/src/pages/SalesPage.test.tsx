@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/endpoints";
 import { ApiError } from "../api/client";
@@ -30,7 +30,7 @@ describe("SalesPage sequential flow", () => {
       opened_by: "admin", opened_at: "2026-01-01T00:00:00Z",
     });
   });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
   it("moves from product selection to payment, confirms, then returns to the role dashboard", async () => {
     const onReturnToDashboard = vi.fn();
@@ -180,6 +180,38 @@ describe("SalesPage sequential flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
     fireEvent.click(screen.getByRole("button", { name: /Descuento de Camisa azul/ }));
     expect(screen.getByLabelText("Descuento por unidad (COP)")).toHaveValue(0);
+  });
+
+  it("keeps a removed product in the cart until the cashier reviews the live change", async () => {
+    vi.useFakeTimers();
+    await act(async () => { render(<SalesPage />); });
+    fireEvent.click(screen.getByRole("button", { name: "Escanear código" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    vi.mocked(api.inventory).mockResolvedValue([]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(screen.getByText("Camisa azul")).toBeInTheDocument();
+    expect(screen.getByText(/El precio, la variante o las existencias/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar carrito con los datos actuales" }));
+    expect(screen.getByText("Agrega prendas para iniciar la venta.")).toBeInTheDocument();
+  });
+
+  it("blocks a changed price during payment without overwriting received cash", async () => {
+    vi.useFakeTimers();
+    await act(async () => { render(<SalesPage />); });
+    fireEvent.click(screen.getByRole("button", { name: "Escanear código" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Pago exacto/ }));
+    vi.mocked(api.inventory).mockResolvedValue([{ ...product, unit_price_cop: 90000 }]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(85000);
+    expect(screen.getByRole("button", { name: /Confirmar venta/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar carrito con los datos actuales" }));
+    fireEvent.click(screen.getByRole("button", { name: "Proceder al cobro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Pago exacto/ }));
+    expect(screen.getByLabelText("Efectivo recibido")).toHaveValue(90000);
   });
 
   it("narrows suggestions by name and variant terms in any order without accents", async () => {

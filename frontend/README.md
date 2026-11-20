@@ -25,7 +25,7 @@ El workflow de GitHub ejecuta estos pasos en cada pull request que cambie `front
 
 ### Edición de cuentas y cámara (CR-034)
 
-Administración puede editar nombre, usuario, correo y contraseña desde Personal. Una contraseña vacía conserva la actual. Cambiar credenciales, rol o estado invalida las sesiones existentes en backend; un cambio solo de nombre no lo hace. El cliente vuelve al login ante una sesión invalidada y verifica la sesión al recuperar el foco y cada minuto. Cambiar credenciales propias cierra sesión inmediatamente. Cambiar el correo desvincula Google: para volver a entrar se requiere el nuevo correo autorizado y vincularlo con las credenciales locales.
+Administración puede editar nombre, usuario, correo y contraseña desde Personal. Una contraseña vacía conserva la actual. Cambiar credenciales, rol o estado invalida las sesiones existentes en backend; un cambio solo de nombre no lo hace. El cliente vuelve al login ante una sesión invalidada y verifica la sesión al recuperar el foco y cada 10 segundos mientras la pestaña está visible. Cambiar credenciales propias cierra sesión inmediatamente. Cambiar el correo desvincula Google: para volver a entrar se requiere el nuevo correo autorizado y vincularlo con las credenciales locales.
 
 «Escanear código» abre una cámara superpuesta en ventas; muestra el SKU leído para confirmar la variante antes de agregar. Inventario permite escanear para buscar o completar el SKU de una prenda nueva. El lector se carga solo al abrir el escáner, prioriza la cámara trasera y admite cambiar de cámara. Al leer, cancelar, salir de la página o cambiar de pestaña libera la cámara. Se mantienen la escritura manual y el lector físico.
 
@@ -54,7 +54,9 @@ El lector multiformato actual incluye EAN/UPC, Code 39/93/128, ITF, Codabar, QR,
 
 El inicio de operación ofrece ventas e inventario a ambos roles. Administración tiene un selector de áreas en la cabecera para consultar su dashboard de gestión; el vendedor no ve ese selector. Volver al inicio conserva el área de origen, y salir de la sesión reinicia la navegación.
 
-Gestión y Finanzas abre por ahora el inventario existente, donde administración gestiona precios y costos. Caja y Personal conservan sus módulos actuales. Métricas del día y Reportes de Novedades muestran «Próximamente», sin cifras ficticias ni navegación a pantallas inexistentes. La separación futura en pasos secuenciales queda fuera de este cambio.
+Gestión y Finanzas abre el inventario, donde administración gestiona precios y costos. Las métricas consultan ventas completadas del día de Bogotá, después de descuentos, y el stock de variantes activas en umbral o agotadas. Los ajustes de cambios siguen registrados por separado en caja. Reportes de Novedades permite aprobar solicitudes y consultar su historial.
+
+Las pantallas de datos consultan el backend cada 10 segundos mientras están visibles. Las consultas periódicas se cancelan al salir y evitan solaparse. Los formularios conservan sus borradores. Si cambian el precio o la disponibilidad de una prenda del carrito, se bloquea el cobro hasta revisar y actualizar el carrito. Un cobro pendiente de reintento conserva su clave y suspende la consulta periódica del catálogo hasta resolverse.
 
 Los recursos gráficos entregados se importan desde `src/assets/icons/` y `src/assets/logos/`; el logo se utiliza también en el inicio de sesión.
 

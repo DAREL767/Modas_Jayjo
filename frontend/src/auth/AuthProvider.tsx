@@ -101,15 +101,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!accessToken) return;
     let active = true;
+    let checking = false;
     const invalidate = (event: Event) => {
       if ((event as CustomEvent<string>).detail !== accessToken) return;
       signOut();
       setError("Tu sesión venció o los datos de acceso cambiaron. Inicia sesión de nuevo.");
     };
-    const verify = () => { void api.currentUser(accessToken).then((current) => { if (active && currentToken.current === accessToken) setUser(current); }).catch(() => undefined); };
+    const verify = () => {
+      if (checking || document.visibilityState === "hidden") return;
+      checking = true;
+      void api.currentUser(accessToken)
+        .then((current) => { if (active && currentToken.current === accessToken) setUser(current); })
+        .catch(() => undefined)
+        .finally(() => { checking = false; });
+    };
     window.addEventListener("auth:invalidated", invalidate);
     window.addEventListener("focus", verify);
-    const timer = window.setInterval(verify, 60000);
+    const timer = window.setInterval(verify, 10000);
     return () => {
       active = false;
       window.removeEventListener("auth:invalidated", invalidate);

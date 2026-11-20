@@ -4,6 +4,7 @@ import type { ChangeRequest, ChangeStatus, Product, ProductChange, ReturnLine, S
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
 import { SaleHistoryList } from "./sales/SaleHistoryList";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 
 const selectClass = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2";
 const labelClass = "grid gap-1.5 text-sm font-medium text-slate-700";
@@ -72,15 +73,27 @@ export function ChangesPage() {
   const [error, setError] = useState<unknown>(null);
   const [submitted, setSubmitted] = useState<ProductChange | null>(null);
   const lastAttempt = useRef<{ id: string; payload: string } | null>(null);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   useEffect(() => {
     if (!accessToken) return;
     let active = true;
     void api.inventory(accessToken).then((items) => {
       if (active) setProducts(items.filter((item) => item.is_active && item.stock_quantity > 0));
-    }).catch((caught) => { if (active) setError(caught); });
+    }).catch((caught) => { if (active) setError(caught); })
+      .finally(() => { if (active) setLoadingProducts(false); });
     return () => { active = false; };
   }, [accessToken]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const [items, availableLines] = await Promise.all([
+      api.inventory(accessToken, true, signal),
+      saleId ? api.returnLines(accessToken, saleId, signal) : Promise.resolve(null),
+    ]);
+    if (signal.aborted) return;
+    setProducts(items.filter((item) => item.is_active && item.stock_quantity > 0));
+    if (availableLines) setLines(availableLines);
+  }, !!accessToken && !loadingProducts && !busy);
 
   const selectedLine = lines?.find((line) => line.product_id === productId);
   const replacement = products.find((item) => item.id === replacementId);
@@ -132,6 +145,7 @@ export function ChangesPage() {
   };
 
   return <Panel title="Solicitar cambio o retiro" description="Describe lo ocurrido. Administración revisará la solicitud antes de aplicar movimientos.">
+    {refreshError != null && <ErrorNotice error={refreshError} />}
     {error !== null && <ErrorNotice error={error} />}
     {submitted && <Notice tone="success">
       Solicitud enviada a Reportes. Referencia <span className="break-all">{submitted.id}</span>.
@@ -232,6 +246,14 @@ export function ChangeReportsPage() {
   }, [accessToken]);
 
   useEffect(() => { void load("state=pending", 0); }, [load]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const params = new URLSearchParams(filters);
+    params.set("skip", String(page * PAGE_SIZE));
+    params.set("limit", String(PAGE_SIZE + 1));
+    const updated = await api.changes(accessToken, params, signal);
+    if (!signal.aborted) setRows(updated);
+  }, !!accessToken && !busy);
 
   const searchReports = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -267,6 +289,7 @@ export function ChangeReportsPage() {
   };
 
   return <Panel title="Reportes de cambios y defectos" description="Revisa solicitudes pendientes y busca por fecha de solicitud, prenda, SKU o número de venta.">
+    {refreshError != null && <ErrorNotice error={refreshError} />}
     <form onSubmit={searchReports} className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <label className={labelClass}>Estado
         <select className={selectClass} value={state} onChange={(event) => setState(event.target.value as ChangeStatus | "")}>
