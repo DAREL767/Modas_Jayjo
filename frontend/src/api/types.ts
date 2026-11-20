@@ -1,5 +1,12 @@
 export type UserRole = "admin" | "vendor";
 
+export interface DashboardMetrics {
+  date: string;
+  sales_total_cop: number;
+  units_sold: number;
+  low_stock_count: number;
+}
+
 export interface User {
   id: string;
   username: string;

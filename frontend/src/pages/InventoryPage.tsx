@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
 import { CameraScanButton } from "../components/CameraScanner";
 import { ChangesPage } from "./ChangesPage";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 
 const emptyProduct: ProductCreate = {
   sku: "",
@@ -45,13 +46,14 @@ async function readProductPhoto(form: HTMLFormElement) {
   }
 }
 
-export function InventoryPage() {
+export function InventoryPage({ initialLowStockOnly = false }: { initialLowStockOnly?: boolean }) {
   const { accessToken, user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [products, setProducts] = useState<Product[]>([]);
   const [draft, setDraft] = useState<ProductCreate>(emptyProduct);
   const [registering, setRegistering] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
+  const [lowStockOnly, setLowStockOnly] = useState(initialLowStockOnly);
   const [editing, setEditing] = useState<Product | null>(null);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [delta, setDelta] = useState(1);
@@ -76,9 +78,15 @@ export function InventoryPage() {
   }, [accessToken, isAdmin]);
 
   useEffect(() => { void reload(); }, [reload]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const items = await api.inventory(accessToken, !isAdmin, signal);
+    if (!signal.aborted) setProducts(items);
+  }, !!accessToken && !loading && !working && !registering && !showChanges && !editing && !adjusting);
 
-  const exactProduct = products.find((product) => product.sku.toUpperCase() === search.trim().toUpperCase());
-  const visibleProducts = exactProduct ? [exactProduct] : products.filter((product) =>
+  const filteredProducts = lowStockOnly ? products.filter((product) => product.is_active && product.stock_quantity >= 0 && product.stock_quantity <= product.low_stock_threshold) : products;
+  const exactProduct = filteredProducts.find((product) => product.sku.toUpperCase() === search.trim().toUpperCase());
+  const visibleProducts = exactProduct ? [exactProduct] : filteredProducts.filter((product) =>
     `${product.name} ${product.sku} ${product.category} ${product.color} ${product.size}`
       .toLocaleLowerCase("es")
       .includes(search.toLocaleLowerCase("es")),
@@ -204,6 +212,11 @@ export function InventoryPage() {
             <input className="mt-1.5 min-h-11 w-full rounded-xl border border-slate-200 px-3.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ej. camiseta, CAM-001, azul" />
           </label>
           <CameraScanButton onDetected={setSearch} label="Escanear para buscar" />
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={lowStockOnly} onChange={(event) => setLowStockOnly(event.target.checked)} />
+            Solo alertas de stock
+          </label>
+          {refreshError != null && <ErrorNotice error={refreshError} />}
           {error !== null && <ErrorNotice error={error} />}
           {notice && <Notice tone="success">{notice}</Notice>}
           {loading ? <p className="py-8 text-center text-sm text-slate-500">Cargando inventario…</p> : visibleProducts.length === 0 ? <p className="rounded-2xl bg-slate-50 py-10 text-center text-sm text-slate-500">No hay prendas que coincidan con la búsqueda.</p> : (

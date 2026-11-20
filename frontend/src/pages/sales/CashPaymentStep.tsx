@@ -4,7 +4,7 @@ const QUICK_CASH_AMOUNTS = [2_000, 5_000, 10_000, 20_000, 50_000, 100_000];
 const MAX_CASH = 2_000_000_000;
 
 export function CashPaymentStep({
-  total, subtotal, discount, cashReceived, error, working, onCashReceivedChange, onBack, onConfirm,
+  total, subtotal, discount, cashReceived, error, working, blocked = false, onCashReceivedChange, onBack, onConfirm,
 }: {
   total: number;
   subtotal: number;
@@ -12,6 +12,7 @@ export function CashPaymentStep({
   cashReceived: number;
   error: unknown;
   working: boolean;
+  blocked?: boolean;
   onCashReceivedChange: (value: number) => void;
   onBack: () => void;
   onConfirm: () => void;
@@ -39,7 +40,7 @@ export function CashPaymentStep({
       </div>
       <div className="sale-card-footer sale-payment-actions">
         <Button variant="secondary" onClick={onBack}>Volver al carrito</Button>
-        <Button className="sale-confirm-button" disabled={working || cashReceived < total || !Number.isInteger(cashReceived) || cashReceived > MAX_CASH} onClick={onConfirm}>{working ? "Procesando venta…" : "✓ Confirmar venta"}</Button>
+        <Button className="sale-confirm-button" disabled={working || blocked || cashReceived < total || !Number.isInteger(cashReceived) || cashReceived > MAX_CASH} onClick={onConfirm}>{working ? "Procesando venta…" : "✓ Confirmar venta"}</Button>
       </div>
     </section>
   );

@@ -3,6 +3,7 @@ import { api } from "../../api/endpoints";
 import type { SaleHistoryEntry } from "../../api/types";
 import { useAuth } from "../../auth/AuthProvider";
 import { Button, ErrorNotice, formatCop } from "../../components/Panel";
+import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 
 const PAGE_SIZE = 10;
 const dateFormat = new Intl.DateTimeFormat("es-CO", {
@@ -35,9 +36,18 @@ export function SaleHistoryList({ query, onSelect, disabled }: {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [accessToken, query, page]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const params = new URLSearchParams(query);
+    params.set("skip", String(page * PAGE_SIZE));
+    params.set("limit", String(PAGE_SIZE + 1));
+    const updated = await api.saleHistory(accessToken, params, signal);
+    if (!signal.aborted) setRows(updated);
+  }, !!accessToken && !loading && !disabled);
 
   return <div className="space-y-3" aria-busy={loading}>
     {error !== null && <ErrorNotice error={error} />}
+    {refreshError != null && <ErrorNotice error={refreshError} />}
     {loading && <p role="status" className="text-sm">Consultando ventas…</p>}
     {!loading && error === null && rows.length === 0 && <p className="text-sm">No hay ventas que coincidan con la consulta.</p>}
     {rows.slice(0, PAGE_SIZE).map((sale) => <details key={sale.sale_id} className="rounded-xl border border-slate-200 p-3" open={onSelect ? true : undefined}>

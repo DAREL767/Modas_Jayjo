@@ -6,6 +6,7 @@ import cashIcon from "../assets/icons/icon-cierre-caja.png";
 import reportsIcon from "../assets/icons/icon-reportes.png";
 import profileIcon from "../assets/icons/icon-perfil.png";
 import "./dashboard.css";
+import { AdminMetrics } from "./AdminMetrics";
 
 export type PageKey = "dashboard" | "sales" | "inventory" | "cash" | "users" | "reports";
 export type DashboardSection = "operation" | "administration";
@@ -21,19 +22,14 @@ const administration: Module[] = [
   { key: "users", page: "users", icon: profileIcon, title: "Personal Autorizado", description: "Gestiona las cuentas, los roles y el acceso del equipo.", button: "Gestionar personal" },
 ];
 
-export function DashboardPage({ user, section = "operation", onNavigate }: {
-  user: User; section?: DashboardSection; onNavigate: (page: PageKey) => void;
+export function DashboardPage({ user, section = "operation", onNavigate, onLowStock }: {
+  user: User; section?: DashboardSection; onNavigate: (page: PageKey) => void; onLowStock?: () => void;
 }) {
   const isAdministration = user.role === "admin" && section === "administration";
   const modules = isAdministration ? administration : operation;
   return <div className="dashboard">
     {isAdministration ? <>
-      <section className="dashboard-metrics" aria-labelledby="metrics-title">
-        <div className="dashboard-section-heading"><h2 id="metrics-title">Métricas del día</h2><span className="dashboard-coming-soon">Próximamente</span></div>
-        <dl className="dashboard-metric-grid">
-          {["Ventas totales", "Prendas vendidas", "Alertas de stock"].map((label) => <div key={label}><dt>{label}</dt><dd>—<span>Sin datos disponibles</span></dd></div>)}
-        </dl>
-      </section>
+      <AdminMetrics onSales={() => onNavigate("cash")} onStock={onLowStock ?? (() => onNavigate("inventory"))} />
       <header className="dashboard-intro"><p className="dashboard-eyebrow">Administración</p><h2>Gestión del negocio</h2><p>Todo lo que necesitas para administrar tu tienda.</p></header>
     </> : <header className="dashboard-intro"><p className="dashboard-eyebrow">Tu tienda, en marcha</p><h2>¿Qué deseas hacer hoy?</h2><p>Selecciona un módulo para comenzar</p></header>}
     <div className={`dashboard-modules ${isAdministration ? "dashboard-modules-admin" : "dashboard-modules-operation"}`}>

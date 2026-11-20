@@ -4,6 +4,7 @@ import type { User, UserCreate, UserRole, UserUpdate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, ErrorNotice, Field, Notice, Panel } from "../components/Panel";
 import { Modal } from "../components/Modal";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 
 const emptyUser: UserCreate = { username: "", email: "", full_name: "", password: "", role: "vendor" };
 
@@ -27,6 +28,11 @@ export function UsersPage() {
     finally { setLoading(false); }
   }, [accessToken]);
   useEffect(() => { void reload(); }, [reload]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const members = await api.users(accessToken, signal);
+    if (!signal.aborted) setUsers(members);
+  }, !!accessToken && !loading && !working);
 
   const saveUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,6 +93,7 @@ export function UsersPage() {
   };
 
   return <div className="space-y-6">
+    {refreshError != null && <ErrorNotice error={refreshError} />}
     <Panel title="Personal autorizado" description="Administra las cuentas locales que pueden vincularse con Google.">
       <div className="space-y-4">
         {error !== null && <ErrorNotice error={error} />}{notice && <Notice tone="success">{notice}</Notice>}

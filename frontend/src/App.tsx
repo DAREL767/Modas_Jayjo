@@ -22,8 +22,10 @@ export default function App() {
 function Workspace({ user, signOut }: { user: User; signOut: () => void }) {
   const [page, setPage] = useState<PageKey>("dashboard");
   const [section, setSection] = useState<DashboardSection>("operation");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const navigate = (next: PageKey) => {
     if (user.role !== "admin" && (next === "cash" || next === "users" || next === "reports")) return;
+    setLowStockOnly(false);
     setPage(next);
   };
 
@@ -36,9 +38,11 @@ function Workspace({ user, signOut }: { user: User; signOut: () => void }) {
     reports: "Reportes de novedades",
   };
   const content = {
-    dashboard: <DashboardPage user={user} section={section} onNavigate={navigate} />,
+    dashboard: <DashboardPage user={user} section={section} onNavigate={navigate} onLowStock={() => {
+      setLowStockOnly(true); setPage("inventory");
+    }} />,
     sales: <SalesPage onReturnToDashboard={() => setPage("dashboard")} />,
-    inventory: <InventoryPage />,
+    inventory: <InventoryPage initialLowStockOnly={lowStockOnly} />,
     cash: <CashRegisterPage />,
     users: <UsersPage />,
     reports: <ChangeReportsPage />,

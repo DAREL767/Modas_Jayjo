@@ -10,6 +10,7 @@ import { CashPaymentStep } from "./sales/CashPaymentStep";
 import { SaleCatalogStep } from "./sales/SaleCatalogStep";
 import { SaleSuccessDialog } from "./sales/SaleSuccessDialog";
 import { CashRegisterPage } from "./CashRegisterPage";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import "./sales/sales-flow.css";
 
 type SaleStep = "catalog" | "payment";
@@ -19,6 +20,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
   const [products, setProducts] = useState<Product[]>([]);
   const [cashSession, setCashSession] = useState<CashSession | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [cartProducts, setCartProducts] = useState<Record<string, Product>>({});
   const [discounts, setDiscounts] = useState<Record<string, number>>({});
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [discountProduct, setDiscountProduct] = useState<Product | null>(null);
@@ -60,11 +62,23 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
   }, [accessToken]);
 
   useEffect(() => { void reloadProducts(); }, [reloadProducts]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const [items, current] = await Promise.all([
+      api.inventory(accessToken, true, signal),
+      api.currentCashSession(accessToken, signal),
+    ]);
+    if (signal.aborted) return;
+    setProducts(items);
+    setCashSession(current);
+    setNeedsOpening(current?.status !== "open");
+  }, !!accessToken && !loading && !working && !sale && !needsOpening && !discountProduct && !confirmGlobal && idempotencyKey.current === null);
 
   const returnToDashboard = useCallback(() => {
     setSale(null);
     setStep("catalog");
     setQuantities({});
+    setCartProducts({});
     setDiscounts({}); setGlobalDiscount(0); setConfirmGlobal(false); setDiscountProduct(null);
     setCashReceived(0);
     setError(null);
@@ -72,18 +86,51 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
     onReturnToDashboard();
   }, [onReturnToDashboard]);
 
-  const cart: CartItem[] = products.flatMap((product) => {
+  const cart: CartItem[] = Object.values(cartProducts).flatMap((product) => {
     const quantity = quantities[product.id] ?? 0;
     return quantity > 0 ? [{ product, quantity, unitDiscountCop: discounts[product.id] ?? 0 }] : [];
   });
   const amounts = saleAmounts(cart, globalDiscount);
   const { subtotal, lineDiscount, discount, total } = amounts;
+  const cartChanged = cart.some(({ product, quantity }) => {
+    const latest = products.find((item) => item.id === product.id);
+    return !latest || !latest.is_active || latest.stock_quantity < quantity ||
+      latest.unit_price_cop !== product.unit_price_cop ||
+      ["sku", "name", "size", "color"].some((key) => latest[key as keyof Product] !== product[key as keyof Product]);
+  });
+
+  const reviewCart = () => {
+    const nextProducts: Record<string, Product> = {};
+    const nextQuantities: Record<string, number> = {};
+    const nextDiscounts: Record<string, number> = {};
+    for (const { product, quantity, unitDiscountCop } of cart) {
+      const latest = products.find((item) => item.id === product.id);
+      if (!latest?.is_active || latest.stock_quantity < 1) continue;
+      nextProducts[latest.id] = latest;
+      nextQuantities[latest.id] = Math.min(quantity, latest.stock_quantity);
+      nextDiscounts[latest.id] = Math.min(unitDiscountCop, latest.unit_price_cop);
+    }
+    setCartProducts(nextProducts);
+    setQuantities(nextQuantities);
+    setDiscounts(nextDiscounts);
+    setGlobalDiscount(0);
+    setCashReceived(0);
+    setStep("catalog");
+    setError(null);
+    idempotencyKey.current = null;
+  };
 
   const changeQuantity = (product: Product, next: number) => {
     setSale(null);
     setError(null);
     idempotencyKey.current = null;
     setGlobalDiscount(0);
+    setCartProducts((current) => {
+      const updated = { ...current };
+      if (next <= 0) delete updated[product.id];
+      else updated[product.id] ??= product;
+      return updated;
+    });
     if (next <= 0) setDiscounts((current) => { const updated = { ...current }; delete updated[product.id]; return updated; });
     setQuantities((current) => {
       const quantity = Math.max(0, Math.min(product.stock_quantity, next));
@@ -95,6 +142,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
   };
 
   const startPayment = () => {
+    if (cartChanged) return;
     if (!cashSession || cashSession.status !== "open") {
       setNeedsOpening(true);
       return;
@@ -110,7 +158,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
   };
 
   const checkout = async () => {
-    if (!accessToken || cart.length === 0 || cashReceived < total || !Number.isInteger(cashReceived) || cashReceived > 2_000_000_000) return;
+    if (!accessToken || cartChanged || cart.length === 0 || cashReceived < total || !Number.isInteger(cashReceived) || cashReceived > 2_000_000_000) return;
     setWorking(true);
     setError(null);
     idempotencyKey.current ??= crypto.randomUUID();
@@ -126,6 +174,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
       );
       setSale(completed);
       setQuantities({});
+      setCartProducts({});
       setDiscounts({}); setGlobalDiscount(0);
       setCashReceived(0);
       idempotencyKey.current = null;
@@ -155,6 +204,11 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
           {cashSession?.status === "open" ? "● Activo" : "● Caja cerrada"}
         </span>
       </header>
+      {refreshError != null && <ErrorNotice error={refreshError} />}
+      {cartChanged && !sale && <div className="sale-discount-summary" role="status">
+        <p>El precio, la variante o las existencias de una prenda cambiaron. Revisa el carrito antes de cobrar.</p>
+        <Button type="button" variant="secondary" disabled={working} onClick={reviewCart}>Actualizar carrito con los datos actuales</Button>
+      </div>}
 
       {loading ? (
         <section className="sale-card sales-loading">Cargando prendas y estado de caja…</section>
@@ -184,6 +238,7 @@ export function SalesPage({ onReturnToDashboard = () => undefined }: { onReturnT
               cashReceived={cashReceived}
               error={error}
               working={working}
+              blocked={cartChanged}
               onCashReceivedChange={(value) => { setCashReceived(value); idempotencyKey.current = null; }}
               onBack={() => { setError(null); setStep("catalog"); }}
               onConfirm={() => void checkout()}
