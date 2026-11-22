@@ -3,6 +3,13 @@
 Proyecto personal de **DAREL767**, desarrollado para la gestión de ventas,
 inventario y caja del negocio Modas Jayjo.
 
+## Entrega estable
+
+La primera entrega estable es **v1.0.0** (22 de noviembre de 2026).
+`main` contiene las entregas estables y `develop` la integración de cambios.
+La etiqueta `v1.0.0` identifica el código de esta entrega; consulta su alcance
+en [CHANGELOG.md](CHANGELOG.md) y el proceso de publicación en [SCM.md](SCM.md).
+
 ## Derechos y uso del código
 
 **Software propietario. Todos los derechos reservados.** Este proyecto no
