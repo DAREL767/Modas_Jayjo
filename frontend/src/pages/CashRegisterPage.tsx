@@ -1,0 +1,158 @@
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { api } from "../api/endpoints";
+import type { CashSession } from "../api/types";
+import { useAuth } from "../auth/AuthProvider";
+import { Button, ErrorNotice, Field, formatCop, Notice, Panel } from "../components/Panel";
+import { Modal } from "../components/Modal";
+import { SaleHistoryList } from "./sales/SaleHistoryList";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
+
+const todayInBogota = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
+}).format(new Date());
+
+export function CashRegisterPage({ onOpened }: { onOpened?: (session: CashSession) => void }) {
+  const { accessToken, user } = useAuth();
+  const [session, setSession] = useState<CashSession | null>(null);
+  const [openingCash, setOpeningCash] = useState(0);
+  const [countedCash, setCountedCash] = useState(0);
+  const [startDate, setStartDate] = useState(todayInBogota);
+  const [endDate, setEndDate] = useState(todayInBogota);
+  const [history, setHistory] = useState<CashSession[]>([]);
+  const [selectedClose, setSelectedClose] = useState<CashSession | null>(null);
+  const [historyRange, setHistoryRange] = useState<[string, string] | null>(null);
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [notice, setNotice] = useState("");
+  const isAdmin = user?.role === "admin";
+
+  const reload = useCallback(async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const current = await api.currentCashSession(accessToken);
+      setSession(current);
+      if (current?.status === "open") onOpened?.(current);
+    }
+    catch (caught) { setError(caught); }
+    finally { setLoading(false); }
+  }, [accessToken, onOpened]);
+  useEffect(() => { void reload(); }, [reload]);
+  const refreshError = useAutoRefresh(async (signal) => {
+    if (!accessToken) return;
+    const [current, closures] = await Promise.all([
+      api.currentCashSession(accessToken, signal),
+      historyRange && isAdmin ? api.cashHistory(accessToken, historyRange[0], historyRange[1], signal) : Promise.resolve(null),
+    ]);
+    if (signal.aborted) return;
+    setSession((previous) => current ?? (previous?.status === "closed" ? previous : null));
+    if (closures) setHistory(closures);
+    if (current?.status === "open") onOpened?.(current);
+  }, !!accessToken && !loading && !working);
+
+  const openSession = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accessToken || !isAdmin) return;
+    setWorking(true); setError(null); setNotice("");
+    try {
+      const opened = await api.openCashSession(accessToken, openingCash, note.trim() || undefined);
+      setSession(opened);
+      setCountedCash(0); setNote(""); setNotice("La caja quedó abierta.");
+      onOpened?.(opened);
+    } catch (caught) { setError(caught); }
+    finally { setWorking(false); }
+  };
+
+  const closeSession = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accessToken || !isAdmin || !session) return;
+    setWorking(true); setError(null); setNotice("");
+    try {
+      setSession(await api.closeCashSession(accessToken, countedCash, note.trim() || undefined));
+      setNote(""); setNotice("El conteo y el cierre de caja quedaron registrados.");
+    } catch (caught) { setError(caught); }
+    finally { setWorking(false); }
+  };
+
+  const loadHistory = async () => {
+    if (!accessToken || !isAdmin) return;
+    setWorking(true); setError(null);
+    try {
+      setHistory(await api.cashHistory(accessToken, startDate, endDate));
+      setHistoryRange([startDate, endDate]);
+    }
+    catch (caught) { setError(caught); }
+    finally { setWorking(false); }
+  };
+
+  return <div className="space-y-6"><Panel title={onOpened ? "Abrir caja para vender" : "Cierre de caja diario"} description={onOpened ? "Al abrir la caja regresarás automáticamente a la venta." : "Consulta el estado y, como administrador, registra el arqueo y el cierre."}>
+    <div className="space-y-5">
+      {(error ?? refreshError) != null && <ErrorNotice error={error ?? refreshError} />}{notice && <Notice tone="success">{notice}</Notice>}
+      {loading ? <p className="py-8 text-center text-sm text-slate-500">Consultando caja…</p> : !session ? <>
+        <Notice tone="info">No hay una caja abierta actualmente.</Notice>
+        {isAdmin && <form className="grid gap-4 sm:grid-cols-2" onSubmit={openSession}>
+          <Field label="Base inicial en efectivo (COP)" type="number" min="0" step="1" value={openingCash} onChange={(event) => setOpeningCash(Number(event.target.value))} required />
+          <Field label="Nota de apertura (opcional)" value={note} maxLength={240} onChange={(event) => setNote(event.target.value)} />
+          <div className="sm:col-span-2"><Button type="submit" disabled={working}>{working ? "Abriendo…" : "Abrir caja"}</Button></div>
+        </form>}
+      </> : <>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-slate-50 p-4"><p className="text-sm text-slate-500">Ventas en efectivo</p><p className="mt-1 text-lg font-bold text-slate-900">{formatCop(session.sales_cash_cop)}</p></div>
+          {!onOpened && <div className="rounded-2xl bg-slate-50 p-4"><p className="text-sm text-slate-500">Ajuste neto por cambios</p><p className="mt-1 text-lg font-bold text-slate-900">{formatCop(session.exchange_cash_cop ?? 0)}</p></div>}
+          {session.expected_cash_cop != null && <div className="rounded-2xl bg-slate-50 p-4"><p className="text-sm text-slate-500">Efectivo esperado</p><p className="mt-1 text-lg font-bold text-slate-900">{formatCop(session.expected_cash_cop)}</p></div>}
+          {session.difference_cash_cop != null && <div className="rounded-2xl bg-slate-50 p-4"><p className="text-sm text-slate-500">Diferencia</p><p className="mt-1 text-lg font-bold text-slate-900">{formatCop(session.difference_cash_cop)}</p></div>}
+        </div>
+        <dl className="grid gap-3 rounded-2xl border border-slate-200 p-4 text-sm sm:grid-cols-2">
+          <div><dt className="text-slate-500">Estado</dt><dd className="mt-1 font-semibold text-emerald-700">{session.status === "open" ? "Abierta" : "Cerrada"}</dd></div>
+          <div><dt className="text-slate-500">Base inicial</dt><dd className="mt-1 font-semibold">{formatCop(session.opening_cash_cop)}</dd></div>
+          <div><dt className="text-slate-500">Apertura</dt><dd className="mt-1">{new Date(session.opened_at).toLocaleString("es-CO")}</dd></div>
+          {session.closed_at && <div><dt className="text-slate-500">Cierre</dt><dd className="mt-1">{new Date(session.closed_at).toLocaleString("es-CO")}</dd></div>}
+        </dl>
+        {session.status === "open" && isAdmin && <form className="space-y-4 border-t border-slate-200 pt-5" onSubmit={closeSession}>
+          <div><h3 className="font-semibold text-slate-900">Arqueo de efectivo</h3><p className="mt-1 text-sm text-slate-500">El efectivo esperado incluye la base inicial, las ventas y el ajuste neto por cambios.</p></div>
+          <Field label="Efectivo contado físicamente (COP)" type="number" min="0" step="1" value={countedCash} onChange={(event) => setCountedCash(Number(event.target.value))} required />
+          <Field label="Notas / gastos del día (opcional)" value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} />
+          <p className="text-xs text-slate-500">Registra aquí gastos y pagos electrónicos para que queden asociados al cierre.</p>
+          <Button type="submit" variant="danger" disabled={working}>{working ? "Cerrando…" : "Confirmar y cerrar caja"}</Button>
+        </form>}
+      </>}
+      {!isAdmin && <p className="text-xs text-slate-500">La apertura y el cierre están disponibles solo para administración.</p>}
+      {!loading && <Button variant="secondary" onClick={() => void reload()}>Actualizar estado</Button>}
+    </div>
+  </Panel>{isAdmin && !onOpened && <Panel title="Historial de cierres" description="Consulta los arqueos registrados por fecha.">
+    <div className="flex flex-wrap items-end gap-3"><Field label="Desde" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required /><Field label="Hasta" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} required /><Button disabled={working || endDate < startDate} onClick={() => void loadHistory()}>Buscar cierres</Button></div>
+    {history.length === 0 ? <p className="mt-5 text-sm text-slate-500">No hay cierres para mostrar en el rango seleccionado.</p> :
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500"><tr>
+            <th className="py-2">Fecha</th><th>Ventas efectivo</th><th>Cambios netos</th><th>Contado</th><th>Diferencia</th><th>Notas</th>
+          </tr></thead>
+          <tbody className="divide-y divide-slate-100">{history.map((closed) => <tr key={closed.id}>
+            <td className="py-3">
+              <button type="button" className="text-left font-medium text-blue-700 underline" onClick={() => setSelectedClose(closed)}>
+                {closed.closed_at ? new Date(closed.closed_at).toLocaleString("es-CO") : "Ver detalle del cierre"}
+              </button>
+            </td>
+            <td>{formatCop(closed.sales_cash_cop)}</td>
+            <td>{formatCop(closed.exchange_cash_cop ?? 0)}</td>
+            <td>{closed.counted_cash_cop == null ? "—" : formatCop(closed.counted_cash_cop)}</td>
+            <td>{closed.difference_cash_cop == null ? "—" : formatCop(closed.difference_cash_cop)}</td>
+            <td className="max-w-64 truncate">{closed.closing_note || "—"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+    {selectedClose && <Modal titleId="cash-close-detail" onClose={() => setSelectedClose(null)}>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="cash-close-detail" className="text-lg font-semibold">Ventas del cierre</h2>
+          <Button type="button" variant="secondary" onClick={() => setSelectedClose(null)}>Cerrar detalle</Button>
+        </div>
+        <p className="text-sm text-slate-600">Ventas en efectivo {formatCop(selectedClose.sales_cash_cop)} · Cambios netos {formatCop(selectedClose.exchange_cash_cop ?? 0)}</p>
+        <SaleHistoryList key={selectedClose.id} query={new URLSearchParams({ cash_session_id: selectedClose.id }).toString()} />
+      </div>
+    </Modal>}
+  </Panel>}</div>;
+}

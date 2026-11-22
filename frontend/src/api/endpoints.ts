@@ -1,0 +1,116 @@
+import { requestJson } from "./client";
+import type {
+  CashSession,
+  DashboardMetrics,
+  ChangeRequest,
+  ProductChange,
+  ReturnLine,
+  Product,
+  ProductCreate,
+  ProductUpdate,
+  Sale,
+  SaleHistoryEntry,
+  SaleRequest,
+  TokenResponse,
+  User,
+  UserCreate,
+  UserUpdate,
+} from "./types";
+
+async function listAll<T>(path: string, token: string, signal?: AbortSignal): Promise<T[]> {
+  const items: T[] = [];
+  const separator = path.includes("?") ? "&" : "?";
+  for (let skip = 0; ; skip += 100) {
+    const page = await requestJson<T[]>(`${path}${separator}skip=${skip}&limit=100`, { signal }, token);
+    items.push(...page);
+    if (page.length < 100) return items;
+  }
+}
+
+export const api = {
+  googleLogin: (credential: string, link?: { username: string; password: string }) =>
+    requestJson<TokenResponse>("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential, ...link }),
+    }),
+  currentUser: (token: string) => requestJson<User>("/api/auth/me", {}, token),
+  dashboardMetrics: (token: string, signal?: AbortSignal) =>
+    requestJson<DashboardMetrics>("/api/dashboard/metrics", { signal }, token),
+  inventory: (token: string, activeOnly = true, signal?: AbortSignal) =>
+    listAll<Product>(`/api/inventory/?active_only=${activeOnly}`, token, signal),
+  productPhoto: (token: string, id: string, signal?: AbortSignal) =>
+    requestJson<{ photo: string | null }>(`/api/inventory/${encodeURIComponent(id)}/photo`, { signal }, token),
+  deleteProduct: (token: string, id: string) =>
+    requestJson<void>(`/api/inventory/${encodeURIComponent(id)}`, { method: "DELETE" }, token),
+  createProduct: (token: string, product: ProductCreate) =>
+    requestJson<Product>(
+      "/api/inventory/",
+      { method: "POST", body: JSON.stringify(product) },
+      token,
+    ),
+  updateProduct: (token: string, id: string, changes: ProductUpdate) =>
+    requestJson<Product>(
+      `/api/inventory/${encodeURIComponent(id)}`,
+      { method: "PATCH", body: JSON.stringify(changes) },
+      token,
+    ),
+  adjustStock: (token: string, id: string, delta: number, reason: string) =>
+    requestJson<{ product: Product; delta: number; reason: string }>(
+      `/api/inventory/${encodeURIComponent(id)}/stock-adjustments`,
+      { method: "POST", body: JSON.stringify({ delta, reason }) },
+      token,
+    ),
+  createSale: (token: string, sale: SaleRequest, idempotencyKey: string) =>
+    requestJson<Sale>(
+      "/api/sales/",
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(sale),
+      },
+      token,
+    ),
+  returnLines: (token: string, saleId: string, signal?: AbortSignal) =>
+    requestJson<ReturnLine[]>(`/api/changes/sale/${encodeURIComponent(saleId)}`, { signal }, token),
+  saleHistory: (token: string, params: URLSearchParams, signal?: AbortSignal) =>
+    requestJson<SaleHistoryEntry[]>(`/api/sales/history?${params}`, { signal }, token),
+  createChange: (token: string, change: ChangeRequest, requestId: string) =>
+    requestJson<ProductChange>("/api/changes/", {
+      method: "POST", headers: { "Idempotency-Key": requestId }, body: JSON.stringify(change),
+    }, token),
+  changes: (token: string, params: URLSearchParams, signal?: AbortSignal) =>
+    requestJson<ProductChange[]>(`/api/changes/?${params}`, { signal }, token),
+  resolveChange: (token: string, id: string, decision: "approve" | "reject") =>
+    requestJson<ProductChange>(`/api/changes/${encodeURIComponent(id)}/${decision}`, { method: "POST" }, token),
+  currentCashSession: (token: string, signal?: AbortSignal) =>
+    requestJson<CashSession | null>("/api/cash-register/current", { signal }, token),
+  openCashSession: (token: string, opening_cash_cop: number, note?: string) =>
+    requestJson<CashSession>(
+      "/api/cash-register/open",
+      { method: "POST", body: JSON.stringify({ opening_cash_cop, note }) },
+      token,
+    ),
+  closeCashSession: (token: string, counted_cash_cop: number, note?: string) =>
+    requestJson<CashSession>(
+      "/api/cash-register/close",
+      { method: "POST", body: JSON.stringify({ counted_cash_cop, note }) },
+      token,
+    ),
+  cashHistory: (token: string, startDate: string, endDate: string, signal?: AbortSignal) =>
+    requestJson<CashSession[]>(
+      `/api/cash-register/history?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`,
+      { signal },
+      token,
+    ),
+  users: (token: string, signal?: AbortSignal) => listAll<User>("/api/users/", token, signal),
+  createUser: (token: string, user: UserCreate) =>
+    requestJson<User>("/api/users/", { method: "POST", body: JSON.stringify(user) }, token),
+  updateUser: (token: string, id: string, changes: UserUpdate) =>
+    requestJson<User>(
+      `/api/users/${encodeURIComponent(id)}`,
+      { method: "PATCH", body: JSON.stringify(changes) },
+      token,
+    ),
+  deactivateUser: (token: string, id: string) =>
+    requestJson<void>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" }, token),
+};

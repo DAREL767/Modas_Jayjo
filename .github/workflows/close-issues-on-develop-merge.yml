@@ -1,0 +1,46 @@
+name: Close linked issues after develop merge
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - closed
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  close-linked-issues:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issues explicitly listed in the PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || "";
+            const keywordPattern = /^\s*(?:close[sd]?|fix(?:e[ds])?|resolve[sd]?)\s*:?\s*#(\d+)\b/gim;
+            const issueNumbers = [...new Set(
+              [...body.matchAll(keywordPattern)].map((match) => Number(match[1]))
+            )];
+
+            for (const issue_number of issueNumbers) {
+              const { data: issue } = await github.rest.issues.get({
+                ...context.repo,
+                issue_number,
+              });
+
+              if (issue.pull_request || issue.state === "closed") {
+                continue;
+              }
+
+              await github.rest.issues.update({
+                ...context.repo,
+                issue_number,
+                state: "closed",
+                state_reason: "completed",
+              });
+              core.info(`Closed issue #${issue_number} after merge into develop.`);
+            }
